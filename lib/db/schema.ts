@@ -1,4 +1,5 @@
-import { boolean, integer, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -12,7 +13,7 @@ export const user = pgTable('user', {
   role: text('role').notNull().default('user'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
-})
+}, (table) => [uniqueIndex('user_email_lower_unique').on(sql`lower(${table.email})`)])
 
 export const session = pgTable('session', {
   id: text('id').primaryKey(),

@@ -40,7 +40,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   const session = await getCurrentSession()
-  const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified))
+  const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified, session.user.role))
   let pendingCount = 0
   if (isAdmin) {
     const [result] = await db
@@ -53,7 +53,7 @@ export default async function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className="antialiased">
-        <SiteHeader isAdmin={isAdmin} pendingCount={pendingCount} />
+        <SiteHeader isAdmin={isAdmin} pendingCount={pendingCount} sessionUser={session?.user ?? null} />
         {children}
         <SiteFooter isAdmin={isAdmin} />
         {process.env.NODE_ENV === 'production' && <Analytics />}

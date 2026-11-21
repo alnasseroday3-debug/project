@@ -4,16 +4,16 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowUpLeft, CarFront, Menu, X } from 'lucide-react'
-import { authClient, useSession } from '@/lib/auth-client'
 
-export function SiteHeader({ isAdmin, pendingCount }: { isAdmin: boolean; pendingCount: number }) {
-  const { data: session } = useSession()
+type HeaderUser = { id: string; name: string; email: string; emailVerified: boolean; role: string; image: string | null }
+
+export function SiteHeader({ isAdmin, pendingCount, sessionUser }: { isAdmin: boolean; pendingCount: number; sessionUser: HeaderUser | null }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
   async function handleSignOut() {
-    await authClient.signOut()
+    await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'same-origin' })
     setMenuOpen(false)
     router.refresh()
   }
@@ -41,11 +41,11 @@ export function SiteHeader({ isAdmin, pendingCount }: { isAdmin: boolean; pendin
         <nav className={`site-nav${menuOpen ? ' is-open' : ''}`} aria-label="التنقل الرئيسي">
           <Link className={pathname === '/' ? 'nav-link is-active' : 'nav-link'} href="/" onClick={closeMenu}>اكتشف السيارات</Link>
           <Link className={pathname === '/sell' ? 'nav-link is-active' : 'nav-link'} href="/sell" onClick={closeMenu}>أضف إعلانك</Link>
-          {session?.user && <Link className={pathname === '/my-listings' ? 'nav-link is-active' : 'nav-link'} href="/my-listings" onClick={closeMenu}>إعلاناتي</Link>}
+          {sessionUser && <Link className={pathname === '/my-listings' ? 'nav-link is-active' : 'nav-link'} href="/my-listings" onClick={closeMenu}>إعلاناتي</Link>}
           {isAdmin && <Link className={pathname === '/admin' ? 'nav-link is-active nav-admin-link' : 'nav-link nav-admin-link'} href="/admin" onClick={closeMenu}>إدارة الإعلانات{pendingCount > 0 && <span className="nav-admin-badge" aria-label={`${pendingCount} طلبات بانتظار المراجعة`}>{pendingCount > 99 ? '99+' : pendingCount}</span>}</Link>}
-          {session?.user ? (
+          {sessionUser ? (
             <div className="nav-account">
-              <span className="nav-greeting">أهلًا، {session.user.name?.split(' ')[0] || 'بك'}</span>
+              <span className="nav-greeting">أهلًا، {sessionUser.name?.split(' ')[0] || 'بك'}</span>
               <button className="nav-signout" type="button" onClick={handleSignOut}>تسجيل الخروج</button>
             </div>
           ) : (

@@ -5,13 +5,12 @@ export async function getCurrentSession() {
   return auth.api.getSession({ headers: await headers() })
 }
 
-export function isAdminEmail(email: string, emailVerified: boolean) {
+export function isAdminEmail(email: string, _emailVerified: boolean, role?: string) {
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase()
-  const productionVerification = process.env.NODE_ENV !== 'production' || emailVerified
-  return Boolean(adminEmail && email.trim().toLowerCase() === adminEmail && productionVerification)
+  return Boolean(adminEmail && email.trim().toLowerCase() === adminEmail && role === 'admin')
 }
 
 export async function isAdminSession() {
   const session = await getCurrentSession()
-  return Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified))
+  return Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified, session.user.role))
 }

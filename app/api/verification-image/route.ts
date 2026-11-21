@@ -8,7 +8,7 @@ import { carListings } from '@/lib/db/schema'
 
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user || !isAdminEmail(session.user.email, session.user.emailVerified)) {
+  if (!session?.user || !isAdminEmail(session.user.email, session.user.emailVerified, session.user.role)) {
     return NextResponse.json({ error: 'غير مصرح.' }, { status: 403 })
   }
 

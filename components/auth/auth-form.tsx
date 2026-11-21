@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FormEvent, useState } from 'react'
 import { ArrowLeft, CarFront, Eye, EyeOff, LockKeyhole, Mail, Phone, UserRound } from 'lucide-react'
-import { authClient } from '@/lib/auth-client'
 import { isValidPhoneNumber, normalizePhoneNumber } from '@/lib/phone'
 
 type AuthFormProps = {
@@ -12,44 +11,15 @@ type AuthFormProps = {
   redirectTo?: string
 }
 
+type AuthResponse = {
+  code?: string
+  message?: string
+  ok?: boolean
+}
+
 function isPhoneIdentifier(value: string) {
   const trimmed = value.trim()
   return /^[+\d٠-٩۰-۹\s()-]+$/.test(trimmed) && isValidPhoneNumber(normalizePhoneNumber(trimmed))
-}
-
-function getAuthErrorMessage(error: { code?: string; status?: number; message?: string }, isSignUp: boolean) {
-  const code = error.code?.toUpperCase() ?? ''
-  const status = Number(error.status)
-
-  if ((code.includes('PHONE') || code.includes('USERNAME')) && code.includes('ALREADY_EXISTS')) {
-    return 'رقم الجوال هذا مسجل بحساب آخر.'
-  }
-  if (code.includes('EMAIL_ALREADY_EXISTS') || code.includes('USER_ALREADY_EXISTS')) {
-    return 'البريد الإلكتروني مستخدم مسبقاً.'
-  }
-  if (code.includes('PASSWORD_TOO_SHORT')) {
-    return 'كلمة المرور قصيرة جداً؛ يجب أن تتكون من 8 أحرف على الأقل.'
-  }
-  if (code.includes('INVALID_EMAIL')) {
-    return 'صيغة البريد الإلكتروني غير صحيحة.'
-  }
-  if (status === 429 || code.includes('TOO_MANY_REQUESTS')) {
-    return 'تجاوزت عدد المحاولات المسموح. انتظر قليلاً ثم حاول مجدداً.'
-  }
-  if (isSignUp && code.includes('INVALID_PHONE')) {
-    return 'رقم الجوال غير صحيح. أدخل رقماً دولياً صالحاً.'
-  }
-  if (!isSignUp && (status === 401 || code.includes('INVALID_EMAIL_OR_PASSWORD'))) {
-    return 'بيانات الدخول غير صحيحة. تحقق من البريد أو رقم الجوال وكلمة المرور.'
-  }
-  if (status >= 500) {
-    return isSignUp
-      ? 'تعذّر إكمال التسجيل بسبب مشكلة مؤقتة في الخادم. حاول مرة أخرى بعد قليل.'
-      : 'تعذّر تسجيل الدخول بسبب مشكلة مؤقتة في الخادم. حاول مرة أخرى بعد قليل.'
-  }
-  return isSignUp
-    ? 'تعذّر إنشاء الحساب. تحقق من البيانات وحاول مرة أخرى.'
-    : 'تعذّر تسجيل الدخول. راجع البيانات وحاول مرة أخرى.'
 }
 
 export function AuthForm({ mode, redirectTo }: AuthFormProps) {
@@ -70,29 +40,28 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
     setError('')
 
     try {
-      if (isSignUp) {
-        const email = identifier.trim().toLowerCase()
-        const normalizedPhone = phone.trim() ? normalizePhoneNumber(phone) : undefined
-        const result = await authClient.signUp.email({
-          name: name.trim(),
-          email,
-          password,
-          ...(normalizedPhone ? { username: normalizedPhone } : {}),
-        })
-        if (result.error) throw new Error(getAuthErrorMessage(result.error, true))
-      } else {
-        const normalized = identifier.trim()
-        const result = isPhoneIdentifier(normalized)
-          ? await authClient.signIn.username({ username: normalizePhoneNumber(normalized), password })
-          : await authClient.signIn.email({ email: normalized.toLowerCase(), password })
-        if (result.error) throw new Error(getAuthErrorMessage(result.error, false))
+      const endpoint = isSignUp ? '/api/auth/sign-up' : '/api/auth/sign-in'
+      const payload = isSignUp
+        ? { name: name.trim(), email: identifier.trim().toLowerCase(), phoneNumber: phone.trim(), password }
+        : { identifier: identifier.trim(), password }
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const result = await response.json().catch(() => ({})) as AuthResponse
+
+      if (!response.ok) {
+        setError(result.message || 'تعذّر إكمال العملية. حاول مرة أخرى.')
+        return
       }
 
       const next = redirectTo?.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/'
-      router.push(next)
+      router.replace(next)
       router.refresh()
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'تعذّر إكمال العملية. حاول مرة أخرى.')
+    } catch {
+      setError('تعذّر الاتصال بالخادم. تحقق من اتصالك بالإنترنت ثم حاول مجدداً.')
     } finally {
       setBusy(false)
     }
@@ -119,11 +88,11 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
             {isSignUp && (
               <label className="form-field"><span>الاسم الكامل</span><span className="input-shell"><UserRound aria-hidden="true" /><input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="مثال: نورة العتيبي" required minLength={2} maxLength={100} /></span></label>
             )}
-            <label className="form-field"><span>{isSignUp ? 'البريد الإلكتروني' : 'البريد الإلكتروني أو رقم الهاتف'}</span><span className="input-shell">{!isSignUp && isPhoneIdentifier(identifier) ? <Phone aria-hidden="true" /> : <Mail aria-hidden="true" />}<input autoComplete={isSignUp ? 'email' : 'username'} type={isSignUp ? 'email' : 'text'} inputMode={isSignUp ? 'email' : 'text'} value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder={isSignUp ? 'name@example.com' : 'البريد أو +9665…'} required maxLength={160} /></span></label>
+            <label className="form-field"><span>{isSignUp ? 'البريد الإلكتروني' : 'البريد الإلكتروني أو رقم الهاتف'}</span><span className="input-shell">{!isSignUp && isPhoneIdentifier(identifier) ? <Phone aria-hidden="true" /> : <Mail aria-hidden="true" />}<input autoComplete={isSignUp ? 'email' : 'username'} type="text" inputMode={isSignUp ? 'email' : 'text'} value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder={isSignUp ? 'name@example.com' : 'البريد أو +963…'} required maxLength={254} /></span></label>
             {isSignUp && (
-              <label className="form-field"><span>رقم الجوال <small>اختياري</small></span><span className="input-shell"><Phone aria-hidden="true" /><input autoComplete="tel" type="tel" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+966 5X XXX XXXX" pattern="\\+?[0-9٠-٩۰-۹\\s()-]{8,20}" /></span><small className="field-help">يمكنك استخدام الرقم كمعرّف للدخول مع كلمة المرور.</small></label>
+              <label className="form-field"><span>رقم الجوال <small>اختياري</small></span><span className="input-shell"><Phone aria-hidden="true" /><input autoComplete="tel" type="tel" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="0992143399 أو +963 992 143 399" maxLength={32} /></span><small className="field-help">يمكنك تركه فارغاً أو استخدامه للدخول لاحقاً.</small></label>
             )}
-            <label className="form-field"><span>كلمة المرور</span><span className="input-shell"><LockKeyhole aria-hidden="true" /><input autoComplete={isSignUp ? 'new-password' : 'current-password'} type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required minLength={8} maxLength={128} /><button className="password-toggle" type="button" aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</button></span>{isSignUp && <small className="field-help">8 أحرف على الأقل.</small>}</label>
+            <label className="form-field"><span>كلمة المرور</span><span className="input-shell"><LockKeyhole aria-hidden="true" /><input autoComplete={isSignUp ? 'new-password' : 'current-password'} type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required minLength={8} maxLength={256} /><button className="password-toggle" type="button" aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</button></span>{isSignUp && <small className="field-help">8 أحرف على الأقل، دون شروط إضافية.</small>}</label>
             {error && <p className="form-alert" role="alert">{error}</p>}
             <button className="primary-button auth-submit" type="submit" disabled={busy}>{busy ? 'لحظة واحدة…' : isSignUp ? 'إنشاء الحساب' : 'تسجيل الدخول'} <ArrowLeft aria-hidden="true" /></button>
           </form>

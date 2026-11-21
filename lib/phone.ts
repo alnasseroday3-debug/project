@@ -7,8 +7,12 @@ export function normalizePhoneNumber(value: string) {
     const digitIndex = arabicIndex >= 0 ? arabicIndex : persianDigits.indexOf(digit)
     return String(digitIndex)
   })
-  const digits = asciiDigits.replace(/\D/g, '')
-  return asciiDigits.startsWith('+') ? `+${digits}` : digits
+  let digits = asciiDigits.replace(/\D/g, '')
+
+  if (digits.startsWith('00')) digits = digits.slice(2)
+  if (/^09\d{8}$/.test(digits)) return `+963${digits.slice(1)}`
+  if (asciiDigits.trim().startsWith('+') || digits.length > 0 && asciiDigits.trim().startsWith('00')) return `+${digits}`
+  return digits
 }
 
 export function isValidPhoneNumber(value: string) {

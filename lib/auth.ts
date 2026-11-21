@@ -1,172 +1,133 @@
-import { betterAuth } from 'better-auth'
-import { APIError } from 'better-auth/api'
-import { eq, ilike, or } from 'drizzle-orm'
-import { username } from 'better-auth/plugins'
-import { pool, db } from '@/lib/db'
-import { user } from '@/lib/db/schema'
-import { isValidPhoneNumber, normalizePhoneNumber } from '@/lib/phone'
+import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
+import bcrypt from 'bcryptjs'
+import { and, eq, gt } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { session as sessionTable, user } from '@/lib/db/schema'
 
-function toOrigin(value?: string) {
-  if (!value) return undefined
-  try {
-    return new URL(value.includes('://') ? value : `https://${value}`).origin
-  } catch {
-    return undefined
+export const SESSION_COOKIE_NAME = '__Host-masar_session'
+export const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 7
+
+export type AuthUser = {
+  id: string
+  name: string
+  email: string
+  emailVerified: boolean
+  role: string
+  image: string | null
+}
+
+type HeaderReader = { get(name: string): string | null }
+
+function digestPassword(password: string) {
+  return createHash('sha256')
+    .update('masar-password-v1\0')
+    .update(password.normalize('NFKC'))
+    .digest('hex')
+}
+
+export async function hashPassword(password: string) {
+  return `bcrypt-sha256$${await bcrypt.hash(digestPassword(password), 12)}`
+}
+
+function verifyLegacyScrypt(password: string, storedHash: string) {
+  const [salt, encodedKey, extra] = storedHash.split(':')
+  if (extra || !salt || !encodedKey || !/^[a-f\d]{128}$/i.test(encodedKey) || !/^[A-Za-z0-9+/_=-]{16,64}$/.test(salt)) {
+    return Promise.resolve(false)
+  }
+
+  return new Promise<boolean>((resolve, reject) => {
+    scrypt(
+      password.normalize('NFKC'),
+      salt,
+      64,
+      { N: 16_384, r: 16, p: 1, maxmem: 64 * 1024 * 1024 },
+      (error, derivedKey) => {
+        if (error) {
+          reject(error)
+          return
+        }
+        const expected = Buffer.from(encodedKey, 'hex')
+        resolve(expected.length === derivedKey.length && timingSafeEqual(expected, derivedKey))
+      },
+    )
+  })
+}
+
+export async function verifyPassword(password: string, storedHash: string) {
+  if (storedHash.startsWith('bcrypt-sha256$')) {
+    return bcrypt.compare(digestPassword(password), storedHash.slice('bcrypt-sha256$'.length))
+  }
+  return verifyLegacyScrypt(password, storedHash)
+}
+
+export function createSessionToken() {
+  return randomBytes(32).toString('base64url')
+}
+
+export function hashSessionToken(token: string) {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+function readSessionToken(headers: HeaderReader) {
+  const cookieHeader = headers.get('cookie')
+  if (!cookieHeader) return null
+
+  for (const part of cookieHeader.split(';')) {
+    const separator = part.indexOf('=')
+    if (separator < 0 || part.slice(0, separator).trim() !== SESSION_COOKIE_NAME) continue
+    const token = part.slice(separator + 1).trim()
+    return /^[A-Za-z0-9_-]{40,64}$/.test(token) ? token : null
+  }
+
+  return null
+}
+
+function roleForSession(email: string, storedRole: string) {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase()
+  return adminEmail && email.trim().toLowerCase() === adminEmail ? 'admin' : storedRole
+}
+
+async function getSession({ headers }: { headers: HeaderReader }) {
+  const token = readSessionToken(headers)
+  if (!token) return null
+
+  const [record] = await db
+    .select({
+      id: sessionTable.id,
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      role: user.role,
+      image: user.image,
+      expiresAt: sessionTable.expiresAt,
+    })
+    .from(sessionTable)
+    .innerJoin(user, eq(sessionTable.userId, user.id))
+    .where(and(eq(sessionTable.token, hashSessionToken(token)), gt(sessionTable.expiresAt, new Date())))
+    .limit(1)
+
+  if (!record) return null
+
+  return {
+    session: {
+      id: record.id,
+      userId: record.userId,
+      expiresAt: record.expiresAt,
+    },
+    user: {
+      id: record.userId,
+      name: record.name,
+      email: record.email,
+      emailVerified: record.emailVerified,
+      role: roleForSession(record.email, record.role),
+      image: record.image,
+    } satisfies AuthUser,
   }
 }
 
-const vercelOrigins = [
-  toOrigin(process.env.VERCEL_URL),
-  toOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL),
-].filter((origin): origin is string => Boolean(origin))
-
-const previewOrigins = [
-  process.env.V0_RUNTIME_URL,
-  process.env.V0_DEV_APP_URL,
-  process.env.V0_BUILD_URL,
-  process.env.V0_SANDBOX_URL,
-].map(toOrigin).filter((origin): origin is string => Boolean(origin))
-
-const configuredAuthOrigin = toOrigin(process.env.BETTER_AUTH_URL)
-const trustedOrigins = [...new Set([
-  ...(configuredAuthOrigin ? [configuredAuthOrigin] : []),
-  ...vercelOrigins,
-  ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000', ...previewOrigins] : []),
-])]
-
-const baseURL =
-  process.env.BETTER_AUTH_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.V0_RUNTIME_URL ??
-        process.env.V0_DEV_APP_URL ??
-        process.env.V0_BUILD_URL ??
-        process.env.V0_SANDBOX_URL ??
-        (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : undefined))
-
-const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase()
-
-export const auth = betterAuth({
-  database: pool,
-  baseURL,
-  emailAndPassword: {
-    enabled: true,
-    autoSignIn: true,
-    minPasswordLength: 8,
-    maxPasswordLength: 128,
+export const auth = {
+  api: {
+    getSession,
   },
-  user: {
-    additionalFields: {
-      phoneNumber: {
-        type: 'string',
-        required: false,
-        input: true,
-      },
-      phoneNumberVerified: {
-        type: 'boolean',
-        required: false,
-        defaultValue: false,
-        input: false,
-      },
-      role: {
-        type: ['user', 'admin'],
-        required: false,
-        defaultValue: 'user',
-        input: false,
-      },
-    },
-  },
-  databaseHooks: {
-    user: {
-      create: {
-        before: async (newUser) => {
-          const email = newUser.email.trim().toLowerCase()
-          const phoneNumber = typeof newUser.phoneNumber === 'string'
-            ? normalizePhoneNumber(newUser.phoneNumber)
-            : ''
-          const usernameValue = typeof newUser.username === 'string'
-            ? normalizePhoneNumber(newUser.username)
-            : phoneNumber
-
-          if (phoneNumber && !isValidPhoneNumber(phoneNumber)) {
-            throw new APIError('BAD_REQUEST', {
-              code: 'INVALID_PHONE_NUMBER',
-              message: 'رقم الجوال غير صحيح.',
-            })
-          }
-
-          const [existingEmail] = await db
-            .select({ id: user.id })
-            .from(user)
-            .where(ilike(user.email, email))
-            .limit(1)
-
-          if (existingEmail) {
-            throw new APIError('BAD_REQUEST', {
-              code: 'EMAIL_ALREADY_EXISTS',
-              message: 'البريد الإلكتروني مستخدم مسبقاً.',
-            })
-          }
-
-          if (phoneNumber) {
-            const [existingPhone] = await db
-              .select({ id: user.id })
-              .from(user)
-              .where(or(eq(user.phoneNumber, phoneNumber), eq(user.username, phoneNumber)))
-              .limit(1)
-
-            if (existingPhone) {
-              throw new APIError('BAD_REQUEST', {
-                code: 'PHONE_ALREADY_EXISTS',
-                message: 'رقم الجوال هذا مسجل بحساب آخر.',
-              })
-            }
-          }
-
-          const normalizedEmail = email
-          const isAdmin = Boolean(adminEmail && normalizedEmail === adminEmail)
-          const normalizedPhone = phoneNumber || null
-
-          return {
-            data: {
-              ...newUser,
-              email: normalizedEmail,
-              phoneNumber: normalizedPhone,
-              phoneNumberVerified: false,
-              username: normalizedPhone ?? (usernameValue || null),
-              role: isAdmin ? 'admin' : 'user',
-            },
-          }
-        },
-      },
-    },
-  },
-  plugins: [
-    username({
-      displayUsername: false,
-      usernameValidator: (value) => /^\+?[1-9]\d{7,14}$/.test(value),
-      usernameNormalization: (value) => normalizePhoneNumber(value),
-    }),
-  ],
-  trustedOrigins: async (request) => {
-    if (!request) return trustedOrigins
-    const requestOrigin = toOrigin(request.url)
-    return requestOrigin ? [...new Set([...trustedOrigins, requestOrigin])] : trustedOrigins
-  },
-  session: {
-    expiresIn: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
-  },
-  ...(process.env.NODE_ENV === 'development'
-    ? {
-        advanced: {
-          defaultCookieAttributes: {
-            sameSite: 'none' as const,
-            secure: true,
-          },
-        },
-      }
-    : {}),
-})
+}
