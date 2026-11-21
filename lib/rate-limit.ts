@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto'
-import { lte, sql } from 'drizzle-orm'
+import { eq, lte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { rateLimits } from '@/lib/db/schema'
 
@@ -12,6 +12,17 @@ function rateLimitKey(scope: string, identity: string) {
   if (!secret) throw new Error('Rate-limit signing secret is not configured.')
   const fingerprint = createHmac('sha256', secret).update(identity.slice(0, 512)).digest('hex')
   return `${scope}:${fingerprint}`
+}
+
+export async function isRateLimitReached(scope: string, identity: string, maximum: number) {
+  const key = rateLimitKey(scope, identity || 'unknown')
+  const [record] = await db
+    .select({ count: rateLimits.count, expiresAt: rateLimits.expiresAt })
+    .from(rateLimits)
+    .where(eq(rateLimits.key, key))
+    .limit(1)
+
+  return Boolean(record && record.expiresAt > new Date() && record.count >= maximum)
 }
 
 export async function consumeRateLimit(scope: string, identity: string, maximum: number, windowMs: number) {
