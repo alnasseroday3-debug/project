@@ -1,10 +1,10 @@
-import { get } from '@vercel/blob'
 import { eq } from 'drizzle-orm'
 import { NextResponse, type NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { isAdminEmail } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
+import { decryptVerificationImage, isOwnedPublicBlobUrl, verificationImageContentType } from '@/lib/blob-storage'
 
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -16,18 +16,22 @@ export async function GET(request: NextRequest) {
   if (!listingId || listingId.length > 80) return NextResponse.json({ error: 'الصورة غير موجودة.' }, { status: 400 })
 
   const [listing] = await db
-    .select({ verificationImage: carListings.verificationImage })
+    .select({ verificationImage: carListings.verificationImage, userId: carListings.userId })
     .from(carListings)
     .where(eq(carListings.id, listingId))
     .limit(1)
-  if (!listing?.verificationImage) return NextResponse.json({ error: 'الصورة غير موجودة.' }, { status: 404 })
+  if (!listing?.verificationImage || !isOwnedPublicBlobUrl(listing.verificationImage, 'verification', listing.userId)) {
+    return NextResponse.json({ error: 'الصورة غير موجودة.' }, { status: 404 })
+  }
 
   try {
-    const result = await get(listing.verificationImage, { access: 'private' })
-    if (!result) return NextResponse.json({ error: 'الصورة غير موجودة.' }, { status: 404 })
-    return new Response(result.stream, {
+    const blobResponse = await fetch(listing.verificationImage, { cache: 'no-store' })
+    if (!blobResponse.ok) return NextResponse.json({ error: 'الصورة غير موجودة.' }, { status: 404 })
+    const encryptedImage = new Uint8Array(await blobResponse.arrayBuffer())
+    const image = decryptVerificationImage(encryptedImage)
+    return new Response(image, {
       headers: {
-        'Content-Type': result.blob.contentType || 'application/octet-stream',
+        'Content-Type': verificationImageContentType(listing.verificationImage),
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
         'Content-Disposition': 'inline',

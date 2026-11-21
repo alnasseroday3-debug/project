@@ -140,7 +140,7 @@ export function ListingWizard({ userName }: { userName: string }) {
         const response = await fetch('/api/uploads', { method: 'POST', body: uploadForm })
         const result = await response.json()
         if (!response.ok) throw new Error(result.error || 'تعذّر رفع الصور.')
-        imagePaths.push(result.pathname)
+        imagePaths.push(result.url)
       }
 
       const verificationForm = new FormData()
@@ -170,7 +170,6 @@ export function ListingWizard({ userName }: { userName: string }) {
         description,
         sellerPhone,
         images: imagePaths,
-        verificationImage: verificationResult.pathname,
       })
       if (!result.success) throw new Error(result.message)
       setComplete(true)

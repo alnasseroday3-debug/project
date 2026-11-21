@@ -1,12 +1,12 @@
 'use server'
 
-import { get } from '@vercel/blob'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
 import { consumeRateLimit, getClientAddress } from '@/lib/rate-limit'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { isOwnedPublicBlobUrl, verificationUploadCookie } from '@/lib/blob-storage'
 
 type ListingDraft = {
   make: string
@@ -28,7 +28,6 @@ type ListingDraft = {
   description: string
   sellerPhone: string
   images: string[]
-  verificationImage: string
 }
 
 const cleanText = (value: unknown, maxLength: number) =>
@@ -40,17 +39,19 @@ const cleanText = (value: unknown, maxLength: number) =>
     : ''
 const isWholeNumber = (value: unknown, minimum: number, maximum: number) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum && value <= maximum
-const isOwnedImagePath = (path: string, folder: string, userId: string) => {
-  const prefix = `${folder}/${userId}/`
-  if (!path.startsWith(prefix)) return false
-  const [fileId, extension, extra] = path.slice(prefix.length).split('.')
-  return !extra && /^[0-9a-f-]{36}$/i.test(fileId) && ['jpg', 'png', 'webp'].includes(extension?.toLowerCase() ?? '')
+async function isUploadedImage(url: string, allowedTypes: string[]) {
+  const response = await fetch(url, { method: 'HEAD', cache: 'no-store' })
+  const contentType = response.headers.get('content-type')?.split(';')[0]?.toLowerCase()
+  const size = Number(response.headers.get('content-length'))
+  return response.ok && allowedTypes.includes(contentType ?? '') && Number.isSafeInteger(size) && size > 0 && size <= 500_000
 }
 
 export async function submitListing(draft: ListingDraft) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { success: false, message: 'سجّل الدخول أولاً لإرسال إعلانك.' }
   if (!draft || typeof draft !== 'object') return { success: false, message: 'بيانات الإعلان غير صالحة.' }
+  const cookieStore = await cookies()
+  const verificationImage = cookieStore.get(verificationUploadCookie)?.value
 
   try {
     const requestHeaders = await headers()
@@ -84,14 +85,17 @@ export async function submitListing(draft: ListingDraft) {
     if (draft.negotiationMin && draft.negotiationMax && draft.negotiationMin > draft.negotiationMax) {
       return { success: false, message: 'الحد الأدنى للتفاوض يجب أن يكون أقل من الحد الأعلى.' }
     }
-    if (new Set(images).size !== images.length || images.some((path) => typeof path !== 'string' || !isOwnedImagePath(path, 'cars', session.user.id))) {
+    if (new Set(images).size !== images.length || images.some((url) => typeof url !== 'string' || !isOwnedPublicBlobUrl(url, 'cars', session.user.id))) {
       return { success: false, message: 'أعد رفع صور السيارة من حسابك.' }
     }
-    if (typeof draft.verificationImage !== 'string' || !isOwnedImagePath(draft.verificationImage, 'verification', session.user.id)) {
-      return { success: false, message: 'صورة التحقق مطلوبة لإرسال الإعلان.' }
+    if (!verificationImage || !isOwnedPublicBlobUrl(verificationImage, 'verification', session.user.id)) {
+      return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
     }
-    const storedImages = await Promise.all([...images, draft.verificationImage].map((path) => get(path, { access: 'private' })))
-    if (storedImages.some((image) => !image || image.blob.size === null || image.blob.size > 5 * 1024 * 1024 || !image.blob.contentType || !['image/jpeg', 'image/png', 'image/webp'].includes(image.blob.contentType))) {
+    const storedImages = await Promise.all([
+      ...images.map((url) => isUploadedImage(url, ['image/jpeg', 'image/png', 'image/webp'])),
+      isUploadedImage(verificationImage, ['application/octet-stream']),
+    ])
+    if (storedImages.some((isValid) => !isValid)) {
       return { success: false, message: 'تعذّر التحقق من الصور. أعد رفع الصور ثم حاول مجدداً.' }
     }
 
@@ -116,12 +120,13 @@ export async function submitListing(draft: ListingDraft) {
       city,
       description: description || null,
       images,
-      verificationImage: draft.verificationImage,
+      verificationImage,
       verified: false,
       status: 'pending',
       sellerName: cleanText(session.user.name, 100),
       sellerPhone,
     })
+    cookieStore.delete(verificationUploadCookie)
     revalidatePath('/')
     revalidatePath('/admin')
     return { success: true, message: 'وصل إعلانك إلى فريق مَسَار للمراجعة.' }

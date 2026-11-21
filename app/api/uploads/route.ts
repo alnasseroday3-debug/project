@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { put } from '@vercel/blob'
 import { NextResponse, type NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
+import { encryptVerificationImage, verificationUploadCookie } from '@/lib/blob-storage'
 import { consumeRateLimit, getClientAddress } from '@/lib/rate-limit'
 
 const maxFileBytes = 500_000
@@ -61,13 +62,27 @@ export async function POST(request: NextRequest) {
     }
 
     const prefix = kind === 'verification' ? 'verification' : 'cars'
-    const pathname = `${prefix}/${session.user.id}/${randomUUID()}.${image.extension}`
-    const blob = await put(pathname, entry, {
-      access: 'private',
+    const encryptedVerification = kind === 'verification' ? encryptVerificationImage(bytes) : null
+    const pathname = `${prefix}/${session.user.id}/${randomUUID()}.${image.extension}${encryptedVerification ? '.enc' : ''}`
+    const blob = await put(pathname, encryptedVerification ?? entry, {
+      access: 'public',
       addRandomSuffix: false,
-      contentType: entry.type,
+      contentType: encryptedVerification ? 'application/octet-stream' : entry.type,
     })
-    return NextResponse.json({ pathname: blob.pathname }, { headers: { 'Cache-Control': 'no-store' } })
+
+    if (kind === 'verification') {
+      const response = NextResponse.json({ uploaded: true }, { headers: { 'Cache-Control': 'no-store' } })
+      response.cookies.set(verificationUploadCookie, blob.url, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 60 * 60,
+      })
+      return response
+    }
+
+    return NextResponse.json({ url: blob.url }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const diagnosticId = randomUUID().slice(0, 8)
     const details = safeUploadError(error) || 'خطأ غير معروف'

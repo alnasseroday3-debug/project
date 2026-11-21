@@ -1,10 +1,10 @@
-import { get } from '@vercel/blob'
 import { eq } from 'drizzle-orm'
 import { NextResponse, type NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
 import { isAdminEmail } from '@/lib/auth-helpers'
+import { isOwnedPublicBlobUrl } from '@/lib/blob-storage'
 
 export async function GET(request: NextRequest) {
   const listingId = request.nextUrl.searchParams.get('listing')
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     .from(carListings)
     .where(eq(carListings.id, listingId))
     .limit(1)
-  if (!listing || !listing.images.includes(pathname)) {
+  if (!listing || !listing.images.includes(pathname) || !isOwnedPublicBlobUrl(pathname, 'cars', listing.userId)) {
     return NextResponse.json({ error: 'الصورة غير موجودة.' }, { status: 404 })
   }
 
@@ -30,19 +30,7 @@ export async function GET(request: NextRequest) {
     if (!isOwner && !isAdmin) return NextResponse.json({ error: 'غير مصرح.' }, { status: 403 })
   }
 
-  try {
-    const result = await get(pathname, { access: 'private' })
-    if (!result) return NextResponse.json({ error: 'الصورة غير موجودة.' }, { status: 404 })
-    return new Response(result.stream, {
-      headers: {
-        'Content-Type': result.blob.contentType || 'application/octet-stream',
-        'Cache-Control': listing.status === 'approved' ? 'public, max-age=3600, stale-while-revalidate=86400' : 'private, no-store',
-        ETag: result.blob.etag,
-        'X-Content-Type-Options': 'nosniff',
-      },
-    })
-  } catch (error) {
-    console.error('[v0] Private car photo delivery failed:', error)
-    return NextResponse.json({ error: 'تعذّر عرض الصورة.' }, { status: 500 })
-  }
+  const response = NextResponse.redirect(new URL(pathname))
+  response.headers.set('Cache-Control', listing.status === 'approved' ? 'public, max-age=3600, stale-while-revalidate=86400' : 'private, no-store')
+  return response
 }
