@@ -130,14 +130,51 @@ async function recordFailedAttempt(scope: string, request: NextRequest, identifi
   }
 }
 
+function parseTrustedOrigin(value: string | undefined) {
+  if (!value) return null
+  try {
+    const candidate = value.includes('://') ? value : `https://${value}`
+    const url = new URL(candidate)
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && url.hostname === 'localhost')) return null
+    return url.origin
+  } catch {
+    return null
+  }
+}
+
 function validateRequestOrigin(request: NextRequest) {
   const origin = request.headers.get('origin')
   if (!origin) return false
-  try {
-    return new URL(origin).origin === request.nextUrl.origin
-  } catch {
-    return false
+
+  const requestOrigin = parseTrustedOrigin(origin)
+  if (!requestOrigin) return false
+
+  const trustedOrigins = new Set([request.nextUrl.origin])
+  if (process.env.NODE_ENV === 'development') trustedOrigins.add('http://localhost:3000')
+
+  const forwardedProtocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
+  const protocol = forwardedProtocol || request.nextUrl.protocol.replace(':', '')
+  for (const host of [
+    request.headers.get('x-forwarded-host')?.split(',')[0]?.trim(),
+    request.headers.get('host')?.trim(),
+  ]) {
+    const trustedOrigin = parseTrustedOrigin(host ? `${protocol}://${host}` : undefined)
+    if (trustedOrigin) trustedOrigins.add(trustedOrigin)
   }
+
+  for (const key of [
+    'VERCEL_URL',
+    'VERCEL_PROJECT_PRODUCTION_URL',
+    'V0_RUNTIME_URL',
+    'V0_DEV_APP_URL',
+    'V0_BUILD_URL',
+    'V0_SANDBOX_URL',
+  ]) {
+    const trustedOrigin = parseTrustedOrigin(process.env[key])
+    if (trustedOrigin) trustedOrigins.add(trustedOrigin)
+  }
+
+  return trustedOrigins.has(requestOrigin)
 }
 
 async function createSessionForUser(userId: string) {
