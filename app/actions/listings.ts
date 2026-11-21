@@ -39,13 +39,6 @@ const cleanText = (value: unknown, maxLength: number) =>
     : ''
 const isWholeNumber = (value: unknown, minimum: number, maximum: number) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum && value <= maximum
-async function isUploadedImage(url: string, allowedTypes: string[]) {
-  const response = await fetch(url, { method: 'HEAD', cache: 'no-store' })
-  const contentType = response.headers.get('content-type')?.split(';')[0]?.toLowerCase()
-  const size = Number(response.headers.get('content-length'))
-  return response.ok && allowedTypes.includes(contentType ?? '') && Number.isSafeInteger(size) && size > 0 && size <= 500_000
-}
-
 export async function submitListing(draft: ListingDraft) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { success: false, message: 'سجّل الدخول أولاً لإرسال إعلانك.' }
@@ -91,14 +84,6 @@ export async function submitListing(draft: ListingDraft) {
     if (!verificationImage || !isOwnedPublicBlobUrl(verificationImage, 'verification', session.user.id)) {
       return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
     }
-    const storedImages = await Promise.all([
-      ...images.map((url) => isUploadedImage(url, ['image/jpeg', 'image/png', 'image/webp'])),
-      isUploadedImage(verificationImage, ['application/octet-stream']),
-    ])
-    if (storedImages.some((isValid) => !isValid)) {
-      return { success: false, message: 'تعذّر التحقق من الصور. أعد رفع الصور ثم حاول مجدداً.' }
-    }
-
     await db.insert(carListings).values({
       id: crypto.randomUUID(),
       userId: session.user.id,
