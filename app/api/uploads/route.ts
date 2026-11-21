@@ -4,7 +4,19 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { consumeRateLimit, getClientAddress } from '@/lib/rate-limit'
 
-const maxFileBytes = 5 * 1024 * 1024
+const maxFileBytes = 500_000
+
+function safeUploadError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  const token = process.env.BLOB_READ_WRITE_TOKEN
+  const redacted = token ? message.replaceAll(token, '[redacted]') : message
+  return redacted
+    .replace(/vercel_blob_rw_[A-Za-z0-9_-]+/gi, '[redacted token]')
+    .replace(/(BLOB_READ_WRITE_TOKEN\s*[:=]\s*)\S+/gi, '$1[redacted]')
+    .replace(/[\r\n\t]+/g, ' ')
+    .trim()
+    .slice(0, 240)
+}
 const imageTypes = new Map([
   ['image/jpeg', { extension: 'jpg', signature: (bytes: Uint8Array) => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff }],
   ['image/png', { extension: 'png', signature: (bytes: Uint8Array) => bytes.subarray(0, 8).join(',') === '137,80,78,71,13,10,26,10' }],
@@ -20,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   const contentLength = Number(request.headers.get('content-length'))
   if (Number.isFinite(contentLength) && contentLength > maxFileBytes + 32 * 1024) {
-    return NextResponse.json({ error: 'حجم الصورة يتجاوز 5 ميغابايت.' }, { status: 413 })
+    return NextResponse.json({ error: 'حجم الصورة المضغوطة يتجاوز 500 كيلوبايت.' }, { status: 413 })
   }
 
   try {
@@ -39,7 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'اختر صورة صالحة.' }, { status: 400 })
     }
     if (entry.size === 0 || entry.size > maxFileBytes) {
-      return NextResponse.json({ error: 'يجب أن تكون الصورة JPG أو PNG أو WebP وبحد أقصى 5 ميغابايت.' }, { status: 400 })
+      return NextResponse.json({ error: 'يجب أن تكون الصورة JPG أو PNG أو WebP وبحد أقصى 500 كيلوبايت.' }, { status: 400 })
     }
 
     const image = imageTypes.get(entry.type)
@@ -57,7 +69,12 @@ export async function POST(request: NextRequest) {
     })
     return NextResponse.json({ pathname: blob.pathname }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('[v0] Car photo upload failed:', error)
-    return NextResponse.json({ error: 'تعذّر رفع الصورة. حاول مرة أخرى.' }, { status: 503 })
+    const diagnosticId = randomUUID().slice(0, 8)
+    const details = safeUploadError(error) || 'خطأ غير معروف'
+    console.error(`[v0] Car photo upload failed (${diagnosticId}):`, error)
+    return NextResponse.json(
+      { error: `تعذّر رفع الصورة: ${details} (مرجع ${diagnosticId})` },
+      { status: 503 },
+    )
   }
 }
