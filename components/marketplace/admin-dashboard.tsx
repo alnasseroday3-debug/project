@@ -9,7 +9,7 @@ import { updateListingStatus } from '@/app/actions/listings'
 import { carImageUrl } from '@/lib/car-image-url'
 import type { CarListing } from '@/lib/db/schema'
 
-const money = new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 0 })
+const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
 export function AdminDashboard({ listings }: { listings: CarListing[] }) {
   const router = useRouter()
@@ -38,7 +38,7 @@ export function AdminDashboard({ listings }: { listings: CarListing[] }) {
         <div className="admin-card-info">
           <div className="admin-card-title"><div><span className="listing-make">{car.make}</span><h2>{car.model} <small>{car.year}</small></h2></div><span className="pending-pill"><Clock3 aria-hidden="true" /> قيد المراجعة</span></div>
           <p className="admin-description">{car.description || 'لا توجد نبذة عن السيارة.'}</p>
-          <div className="admin-facts"><span>{money.format(car.askingPrice)} ر.س</span><span>{money.format(car.mileage)} كم</span><span><MapPin aria-hidden="true" /> {car.city}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName}</span></div>
+          <div className="admin-facts"><span dir="ltr">${money.format(car.askingPrice)} USD</span><span>{money.format(car.mileage)} كم</span><span><MapPin aria-hidden="true" /> {car.city}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName}</span></div>
           <div className="admin-review-actions"><Link className="review-details" href={`/cars/${car.id}`} target="_blank" rel="noreferrer">تفاصيل الإعلان <ArrowUpLeft aria-hidden="true" /></Link><button type="button" className="review-reject" disabled={isPending} onClick={() => review(car.id, 'rejected')}><X aria-hidden="true" /> {activeId === car.id ? 'جارٍ التحديث…' : 'رفض'}</button><button type="button" className="review-approve" disabled={isPending} onClick={() => review(car.id, 'approved')}><Check aria-hidden="true" /> {activeId === car.id ? 'جارٍ التحديث…' : 'موافقة ونشر'}</button></div>
         </div>
       </article>)}</div> : <section className="admin-empty"><span><Check aria-hidden="true" /></span><h2>أنت على اطلاع.</h2><p>لا توجد إعلانات تنتظر المراجعة حالياً.</p><Link className="primary-button" href="/">تصفح السوق <ArrowUpLeft aria-hidden="true" /></Link></section>}

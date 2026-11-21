@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { AtSign, CarFront, MapPin } from 'lucide-react'
+import { AtSign, CarFront } from 'lucide-react'
 
 export function SiteFooter() {
   return (
@@ -19,8 +19,8 @@ export function SiteFooter() {
           <Link href="/admin">إدارة الإعلانات</Link>
         </div>
         <div className="footer-location">
-          <span className="footer-title">من قلب المملكة</span>
-          <span><MapPin aria-hidden="true" /> الرياض، السعودية</span>
+          <span className="footer-title">منصتك الموثوقة</span>
+          <span>لبيع وشراء السيارات بكل شفافية</span>
           <span><AtSign aria-hidden="true" /> masar.cars</span>
         </div>
       </div>

@@ -6,22 +6,15 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowUpLeft, Check, ChevronDown, CircleHelp, Gauge, MapPin, Search, ShieldCheck, SlidersHorizontal, Sparkles, Tag } from 'lucide-react'
 import type { CarListing } from '@/lib/db/schema'
+import { carImageUrl } from '@/lib/car-image-url'
 
-const money = new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 0 })
-
-function carImageSource(car: CarListing) {
-  const image = car.images[0]
-  if (!image) return '/images/hero-cars.png'
-  return image.startsWith('http')
-    ? image
-    : `/api/car-images?listing=${encodeURIComponent(car.id)}&path=${encodeURIComponent(image)}`
-}
+const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
 function ListingCard({ car }: { car: CarListing }) {
   return (
     <article className="listing-card">
       <Link className="listing-image-link" href={`/cars/${car.id}`} aria-label={`عرض ${car.make} ${car.model}`}>
-        <CarPhoto src={carImageSource(car)} alt={`${car.make} ${car.model} ${car.year}`} width={720} height={480} className="listing-image" />
+        <CarPhoto src={carImageUrl(car)} alt={`${car.make} ${car.model} ${car.year}`} width={720} height={480} className="listing-image" />
         <span className="condition-badge">{car.condition === 'new' ? 'جديدة' : 'مستعملة'}</span>
         <span className="image-arrow"><ArrowUpLeft aria-hidden="true" /></span>
       </Link>
@@ -35,10 +28,10 @@ function ListingCard({ car }: { car: CarListing }) {
         </div>
         <div className="listing-meta">
           <span><Gauge aria-hidden="true" />{money.format(car.mileage)} كم</span>
-          <span><MapPin aria-hidden="true" />{car.city || 'السعودية'}</span>
+          <span><MapPin aria-hidden="true" />{car.city || 'سوريا'}</span>
         </div>
         <div className="listing-price-row">
-          <p className="listing-price"><strong>{money.format(car.askingPrice)}</strong><span> ر.س</span></p>
+          <p className="listing-price" dir="ltr"><strong>${money.format(car.askingPrice)}</strong></p>
           <Link className="text-link" href={`/cars/${car.id}`} aria-label={`تفاصيل ${car.make} ${car.model}`}><ArrowLeft aria-hidden="true" /></Link>
         </div>
       </div>
@@ -120,10 +113,10 @@ export function HomePage({ cars }: { cars: CarListing[] }) {
               ))}
             </div>
             <fieldset className="price-filter">
-              <legend className="sr-only">نطاق السعر بالريال</legend>
-              <label><span className="sr-only">أقل سعر بالريال</span><input aria-label="أقل سعر بالريال" type="number" min="0" inputMode="numeric" placeholder="من" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label>
+              <legend className="sr-only">نطاق السعر بالدولار الأمريكي</legend>
+              <label><span className="sr-only">أقل سعر بالدولار</span><input aria-label="أقل سعر بالدولار" type="number" min="0" inputMode="numeric" placeholder="من $" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label>
               <span aria-hidden="true">–</span>
-              <label><span className="sr-only">أعلى سعر بالريال</span><input aria-label="أعلى سعر بالريال" type="number" min="0" inputMode="numeric" placeholder="إلى" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
+              <label><span className="sr-only">أعلى سعر بالدولار</span><input aria-label="أعلى سعر بالدولار" type="number" min="0" inputMode="numeric" placeholder="إلى $" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
             </fieldset>
             <span className="result-count"><SlidersHorizontal aria-hidden="true" /> {filteredCars.length} إعلانات</span>
           </div>

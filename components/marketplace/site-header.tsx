@@ -41,6 +41,7 @@ export function SiteHeader() {
         <nav className={`site-nav${menuOpen ? ' is-open' : ''}`} aria-label="التنقل الرئيسي">
           <Link className={pathname === '/' ? 'nav-link is-active' : 'nav-link'} href="/" onClick={closeMenu}>اكتشف السيارات</Link>
           <Link className={pathname === '/sell' ? 'nav-link is-active' : 'nav-link'} href="/sell" onClick={closeMenu}>أضف إعلانك</Link>
+          {session?.user && <Link className={pathname === '/my-listings' ? 'nav-link is-active' : 'nav-link'} href="/my-listings" onClick={closeMenu}>إعلاناتي</Link>}
           <Link className={pathname === '/admin' ? 'nav-link is-active' : 'nav-link'} href="/admin" onClick={closeMenu}>إدارة الإعلانات</Link>
           {session?.user ? (
             <div className="nav-account">

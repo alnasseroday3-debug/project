@@ -6,10 +6,10 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'مَسَار | سوق السيارات في السعودية',
+    default: 'مَسَار | سوق السيارات في سوريا',
     template: '%s | مَسَار',
   },
-  description: 'اكتشف سيارات مستعملة وجديدة بإعلانات واضحة ومراجعة دقيقة. مَسَار يقرّبك من سيارتك القادمة بثقة.',
+  description: 'اكتشف سيارات مستعملة وجديدة في سوريا بإعلانات واضحة ومراجعة دقيقة. مَسَار يقرّبك من سيارتك القادمة بثقة.',
   applicationName: 'مَسَار',
   generator: 'v0.app',
   icons: {
@@ -25,7 +25,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   colorScheme: 'light',
-  themeColor: '#f6f5f0',
+  themeColor: '#e5e7eb',
 }
 
 export default function RootLayout({
