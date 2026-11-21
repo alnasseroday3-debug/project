@@ -47,7 +47,10 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
       const response = await fetch(endpoint, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
         body: JSON.stringify(payload),
       })
       const result = await response.json().catch(() => ({})) as AuthResponse

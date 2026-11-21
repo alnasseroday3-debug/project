@@ -369,6 +369,9 @@ async function signOut(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (request.headers.get('x-requested-with') !== 'XMLHttpRequest') {
+    return jsonResponse({ code: 'INVALID_REQUEST_HEADER', message: 'تعذّر التحقق من الطلب. حدّث الصفحة ثم حاول مجدداً.' }, 403)
+  }
   if (!validateRequestOrigin(request)) {
     return jsonResponse({ code: 'INVALID_ORIGIN', message: 'تعذّر التحقق من مصدر الطلب. حدّث الصفحة ثم حاول مجدداً.' }, 403)
   }

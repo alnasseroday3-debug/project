@@ -13,7 +13,11 @@ export function SiteHeader({ isAdmin, pendingCount, sessionUser }: { isAdmin: bo
   const pathname = usePathname()
 
   async function handleSignOut() {
-    await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'same-origin' })
+    await fetch('/api/auth/sign-out', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
     setMenuOpen(false)
     router.refresh()
   }
