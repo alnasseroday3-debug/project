@@ -46,18 +46,10 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
     setHiddenIds((current) => [...current, listing.id])
     setConfirmingListing(null)
     try {
-    try {
       const result = await removeOwnedListing(listing.id)
       if (!result.success) setHiddenIds((current) => current.filter((id) => id !== listing.id))
       setFeedback(result.message)
       if (result.success) router.refresh()
-    } catch {
-      setHiddenIds((current) => current.filter((id) => id !== listing.id))
-      setFeedback('تعذّر الاتصال بالخادم. حاول مرة أخرى.')
-    } finally {
-      setIsDeleting(false)
-    }
-
     } catch {
       setHiddenIds((current) => current.filter((id) => id !== listing.id))
       setFeedback('تعذّر الاتصال بالخادم. حاول مرة أخرى.')

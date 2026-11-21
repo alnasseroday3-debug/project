@@ -55,6 +55,8 @@ export const verification = pgTable('verification', {
   updatedAt: timestamp('updatedAt').defaultNow(),
 })
 
+export type ListingStatus = 'pending' | 'approved' | 'rejected' | 'archived'
+
 export const carListings = pgTable('car_listings', {
   id: text('id').primaryKey(),
   userId: text('userId').notNull(),
@@ -78,7 +80,7 @@ export const carListings = pgTable('car_listings', {
   images: jsonb('images').$type<string[]>().notNull().default([]),
   verificationImage: text('verification_image'),
   verified: boolean('verified').notNull().default(false),
-  status: text('status').notNull().default('pending'),
+  status: text('status').$type<ListingStatus>().notNull().default('pending'),
   rejectionReason: text('rejection_reason'),
   sellerName: text('sellerName'),
   sellerPhone: text('sellerPhone'),

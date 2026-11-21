@@ -28,6 +28,24 @@ export async function PATCH(request: NextRequest) {
     const status = values.status
     const verified = values.verified === true
     const rejectionReason = typeof values.rejectionReason === 'string' ? values.rejectionReason : ''
+
+    if (values.action === 'archive' || values.action === 'republish') {
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })
+      const archiving = values.action === 'archive'
+      const updated = await db.update(carListings)
+        .set({ status: archiving ? 'archived' : 'approved', updatedAt: new Date() })
+        .where(and(eq(carListings.id, id), eq(carListings.status, archiving ? 'approved' : 'archived')))
+        .returning({ id: carListings.id })
+      if (updated.length === 0) {
+        return NextResponse.json({ success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }, { status: 409 })
+      }
+      revalidatePath('/')
+      revalidatePath('/admin')
+      revalidatePath('/my-listings')
+      revalidatePath(`/cars/${id}`)
+      return NextResponse.json({ success: true, message: archiving ? 'تم نقل الإعلان إلى الأرشيف.' : 'تمت إعادة نشر الإعلان.' })
+    }
+
     if (!id || (status !== 'approved' && status !== 'rejected') || typeof values.verified !== 'boolean') {
       return NextResponse.json({ success: false, message: 'بيانات المراجعة غير صالحة.' }, { status: 400 })
     }
@@ -72,9 +90,12 @@ export async function DELETE(request: NextRequest) {
     const [listing] = await db.select({ id: carListings.id, status: carListings.status, userId: carListings.userId, images: carListings.images, verificationImage: carListings.verificationImage })
       .from(carListings).where(eq(carListings.id, id)).limit(1)
     if (!listing) return NextResponse.json({ success: false, message: 'الإعلان غير موجود.' }, { status: 404 })
+    if (listing.status !== 'archived') {
+      return NextResponse.json({ success: false, message: 'انقل الإعلان إلى الأرشيف قبل حذفه نهائياً.' }, { status: 409 })
+    }
 
     const deleted = await db.delete(carListings)
-      .where(and(eq(carListings.id, listing.id), eq(carListings.status, listing.status)))
+      .where(and(eq(carListings.id, listing.id), eq(carListings.status, 'archived')))
       .returning({ id: carListings.id })
     if (deleted.length === 0) return NextResponse.json({ success: false, message: 'تغيرت بيانات الإعلان. حدّث الصفحة وحاول مجدداً.' }, { status: 409 })
 
