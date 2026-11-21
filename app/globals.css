@@ -755,3 +755,68 @@ select.plain-input { appearance: auto; }
   .admin-review-actions { flex-wrap: wrap; }
   .review-details { width: 100%; margin-bottom: 4px; }
 }
+
+.support-launch { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 8px; padding: 7px 9px; background: transparent; color: #315f44; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; transition: background .18s ease, color .18s ease; }
+.support-launch:hover { background: #e9f1e8; color: #174e34; }
+.support-launch:focus-visible { outline: 3px solid #96b3a0; outline-offset: 3px; }
+.support-launch--navigation { display: none; }
+.support-whatsapp-icon { width: 18px; height: 18px; flex: 0 0 auto; }
+.support-dialog { width: min(520px, calc(100% - 28px)); max-height: min(760px, calc(100% - 32px)); overflow-y: auto; margin: auto; border: 1px solid #d7dfd8; border-radius: 18px; padding: clamp(20px, 5vw, 30px); background: #f3f5f6; color: #26372d; box-shadow: 0 24px 80px rgba(22, 39, 28, .24); }
+.support-dialog::backdrop { background: rgba(20, 35, 27, .58); backdrop-filter: blur(3px); }
+.support-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.support-dialog-heading h2 { margin: 5px 0 3px; color: #26382d; font-size: 25px; letter-spacing: -.6px; }
+.support-dialog-heading p { margin: 0; color: #727e74; font-size: 12px; }
+.support-dialog-kicker { color: #56745f; font-size: 10px; font-weight: 800; }
+.support-dialog-close { display: grid; flex: 0 0 auto; place-items: center; width: 35px; height: 35px; border: 1px solid #dce2dc; border-radius: 10px; background: #fff; color: #657469; cursor: pointer; }
+.support-dialog-close svg { width: 17px; height: 17px; }
+.support-form { display: flex; flex-direction: column; gap: 14px; }
+.support-field { display: flex; flex-direction: column; gap: 6px; color: #46574b; font-size: 11px; font-weight: 700; }
+.support-field > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.support-field small { color: #929b91; font-size: 10px; font-weight: 500; }
+.support-field input, .support-field select, .support-field textarea { width: 100%; min-width: 0; border: 1px solid #dce2dc; border-radius: 9px; padding: 11px 12px; background: #fff; color: #28382e; font: inherit; font-size: 12px; font-weight: 400; }
+.support-field input, .support-field select { min-height: 44px; }
+.support-field textarea { min-height: 106px; resize: vertical; line-height: 1.8; }
+.support-field input:focus, .support-field select:focus, .support-field textarea:focus { border-color: #7e9b87; outline: 3px solid rgba(126, 155, 135, .18); }
+.support-field input::placeholder, .support-field textarea::placeholder { color: #a0a8a0; }
+.support-field input:disabled, .support-field select:disabled, .support-field textarea:disabled { opacity: .65; }
+.support-error { margin: 0; border: 1px solid #e7c5bf; border-radius: 8px; padding: 9px 11px; background: #fff5f2; color: #993d32; font-size: 11px; }
+.support-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 9px; margin-top: 2px; }
+.support-submit, .support-cancel { min-height: 43px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; padding: 0 14px; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.support-submit { border: 1px solid #078052; background: #078052; color: #fff; }
+.support-submit:hover { border-color: #065f46; background: #065f46; }
+.support-submit svg { width: 16px; height: 16px; }
+.support-cancel { border: 1px solid #d8dfd8; background: #fff; color: #58665c; }
+.support-submit:disabled, .support-cancel:disabled, .support-dialog-close:disabled { opacity: .55; cursor: not-allowed; }
+.support-privacy-note { margin: -4px 0 0; color: #8a948b; font-size: 10px; }
+.support-success { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; border: 1px solid #dce5dc; border-radius: 12px; padding: 20px; background: #fff; }
+.support-success-mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: #e8f2e8; color: #315f44; }
+.support-success-mark svg { width: 20px; height: 20px; }
+.support-success h3 { margin: 0; color: #2d4936; font-size: 19px; }
+.support-success p { margin: 0; color: #707c73; font-size: 12px; line-height: 1.8; }
+.support-reference { border: 1px dashed #b9cbbb; border-radius: 8px; padding: 8px 12px; background: #f4f8f3; color: #315f44; font-size: 15px; letter-spacing: .06em; }
+.support-inline-note { color: #8a6538 !important; }
+.support-success .support-submit { width: 100%; text-decoration: none; }
+.support-success .support-cancel { min-height: 38px; }
+.support-inbox { min-width: 0; }
+.support-ticket-list { display: flex; flex-direction: column; gap: 12px; }
+.support-ticket-card { min-width: 0; border: 1px solid #e2e5dd; border-radius: 12px; padding: 17px 19px 14px; background: #f3f5f6; }
+.support-ticket-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 10px; }
+.support-ticket-header > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.support-ticket-reference { border-radius: 6px; padding: 4px 8px; background: #e8efe7; color: #315f44; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
+.support-ticket-category { color: #748076; font-size: 10px; font-weight: 700; }
+.support-ticket-date { display: inline-flex; align-items: center; gap: 6px; color: #8b938a; font-size: 10px; }
+.support-ticket-date svg { width: 13px; height: 13px; }
+.support-ticket-card h2 { margin: 0 0 8px; color: #2f4035; font-size: 16px; }
+.support-ticket-message { margin: 0; color: #69756b; font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.support-ticket-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 14px; border-top: 1px solid #e8eae4; padding-top: 11px; color: #8b938a; font-size: 10px; }
+.support-ticket-actions strong { margin-inline-start: 5px; color: #596a5d; }
+.support-ticket-actions .admin-permanent-delete { min-height: 32px; }
+
+@media (max-width: 760px) {
+  .support-launch--navigation { display: inline-flex; min-height: 44px; justify-content: flex-start; margin-top: 5px; border-top: 1px solid #e8e8e1; border-radius: 0; padding: 11px 5px 4px; }
+  .support-dialog { padding: 19px 16px; }
+  .support-dialog-heading h2 { font-size: 22px; }
+  .support-dialog-actions { flex-direction: column-reverse; }
+  .support-dialog-actions button { width: 100%; }
+  .support-ticket-card { padding: 14px; }
+}

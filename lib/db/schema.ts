@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core'
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -56,6 +56,24 @@ export const verification = pgTable('verification', {
 })
 
 export type ListingStatus = 'pending' | 'approved' | 'rejected' | 'archived'
+export type SupportCategory = 'technical_issue' | 'listing_question' | 'report_violation' | 'general_inquiry'
+
+export const supportTickets = pgTable('support_tickets', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  reference: varchar('reference', { length: 32 }).notNull().unique(),
+  fullName: varchar('full_name', { length: 120 }).notNull(),
+  category: varchar('category', { length: 40 }).$type<SupportCategory>().notNull(),
+  message: varchar('message', { length: 500 }).notNull(),
+  ipHash: varchar('ip_hash', { length: 64 }).notNull(),
+  captchaNonce: varchar('captcha_nonce', { length: 64 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('support_tickets_captcha_nonce_unique').on(table.captchaNonce),
+  index('support_tickets_ip_created_at_idx').on(table.ipHash, table.createdAt),
+])
+
+export type SupportTicket = typeof supportTickets.$inferSelect
+export type AdminSupportTicket = Pick<SupportTicket, 'id' | 'reference' | 'fullName' | 'category' | 'message' | 'createdAt'>
 
 export const carListings = pgTable('car_listings', {
   id: text('id').primaryKey(),

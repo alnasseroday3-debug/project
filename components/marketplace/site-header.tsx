@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowUpLeft, CarFront, Menu, X } from 'lucide-react'
+import { SupportContact } from '@/components/marketplace/support-contact'
 
 type HeaderUser = { id: string; name: string; email: string; emailVerified: boolean; role: string; image: string | null }
 
@@ -57,6 +58,7 @@ export function SiteHeader({ isAdmin, pendingCount, myListingsCount, sessionUser
               دخول <ArrowUpLeft aria-hidden="true" />
             </Link>
           )}
+          <SupportContact location="navigation" />
         </nav>
       </div>
     </header>

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { AtSign, CarFront } from 'lucide-react'
+import { SupportContact } from '@/components/marketplace/support-contact'
 
 export function SiteFooter({ isAdmin }: { isAdmin: boolean }) {
   return (
@@ -22,6 +23,7 @@ export function SiteFooter({ isAdmin }: { isAdmin: boolean }) {
           <span className="footer-title">منصتك الموثوقة</span>
           <span>لبيع وشراء السيارات بكل شفافية</span>
           <span><AtSign aria-hidden="true" /> masar.cars</span>
+          <SupportContact location="footer" />
         </div>
       </div>
       <div className="footer-bottom">

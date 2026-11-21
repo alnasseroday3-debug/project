@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import { Archive, ArrowUpLeft, BadgeCheck, Check, Clock3, MapPin, MessageCircle, ShieldCheck, Trash2, X } from 'lucide-react'
 import { CarPhoto } from '@/components/marketplace/car-photo'
+import { SupportInbox } from '@/components/marketplace/support-inbox'
 import { carImageUrl } from '@/lib/car-image-url'
-import type { CarListing } from '@/lib/db/schema'
+import type { AdminSupportTicket, CarListing } from '@/lib/db/schema'
 
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
-type AdminSection = 'pending' | 'published' | 'archived'
+type AdminSection = 'pending' | 'published' | 'archived' | 'support'
 type AdminDeleteTarget = { car: CarListing; archived: boolean }
 
 function whatsappUrl(phone: string, make: string, model: string, year: number) {
@@ -52,7 +53,7 @@ function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onDe
   )
 }
 
-export function AdminDashboard({ listings, publishedListings, archivedListings }: { listings: CarListing[]; publishedListings: CarListing[]; archivedListings: CarListing[] }) {
+export function AdminDashboard({ listings, publishedListings, archivedListings, supportTickets }: { listings: CarListing[]; publishedListings: CarListing[]; archivedListings: CarListing[]; supportTickets: AdminSupportTicket[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [activeId, setActiveId] = useState('')
@@ -171,20 +172,21 @@ export function AdminDashboard({ listings, publishedListings, archivedListings }
     review(rejectingId, 'rejected', rejectionReason)
   }
 
-  const selectedListings = activeSection === 'pending' ? visiblePending : activeSection === 'published' ? visiblePublished : visibleArchived
+  const selectedListings = activeSection === 'pending' ? visiblePending : activeSection === 'published' ? visiblePublished : activeSection === 'archived' ? visibleArchived : []
 
   return (
     <>
       <main className="admin-page page-container">
         <div className="admin-topline"><span className="eyebrow eyebrow-green"><ShieldCheck aria-hidden="true" /> مساحة فريق مَسَار</span><Link className="admin-back" href="/"><ArrowUpLeft aria-hidden="true" /> العودة للسوق</Link></div>
-        <div className="admin-heading"><div><h1>إدارة الإعلانات.</h1><p>راجع الطلبات، وتابع الإعلانات المنشورة، واحتفظ بسجل الإعلانات المحذوفة.</p></div><div className="admin-count"><Clock3 aria-hidden="true" /><span><strong>{visiblePending.length}</strong><small>بانتظار المراجعة</small></span></div></div>
-        <nav className="admin-tabs" aria-label="أقسام إدارة الإعلانات">
+        <div className="admin-heading"><div><h1>إدارة مَسَار.</h1><p>راجع الإعلانات الواردة، وتابع طلبات الدعم وسجل الإعلانات.</p></div><div className="admin-count"><Clock3 aria-hidden="true" /><span><strong>{visiblePending.length}</strong><small>بانتظار المراجعة</small></span></div></div>
+        <nav className="admin-tabs" aria-label="أقسام الإدارة">
           <button type="button" aria-pressed={activeSection === 'pending'} className={activeSection === 'pending' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('pending')}><Clock3 aria-hidden="true" />طلبات المراجعة<span>{visiblePending.length}</span></button>
           <button type="button" aria-pressed={activeSection === 'published'} className={activeSection === 'published' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('published')}><BadgeCheck aria-hidden="true" />الإعلانات المنشورة<span>{visiblePublished.length}</span></button>
           <button type="button" aria-pressed={activeSection === 'archived'} className={activeSection === 'archived' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('archived')}><Archive aria-hidden="true" />أرشيف الإعلانات المحذوفة / المباعة<span>{visibleArchived.length}</span></button>
+          <button type="button" aria-pressed={activeSection === 'support'} className={activeSection === 'support' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('support')}><MessageCircle aria-hidden="true" />طلبات الدعم<span>{supportTickets.length}</span></button>
         </nav>
         {feedback && <p className="form-success admin-feedback" role="status">{feedback}</p>}
-        {selectedListings.length ? <div className="admin-list">
+        {activeSection === 'support' ? <SupportInbox tickets={supportTickets} /> : selectedListings.length ? <div className="admin-list">
           {activeSection === 'pending' ? visiblePending.map((car) => <article className="admin-card" key={car.id}>
             <div className="admin-card-photo"><CarPhoto src={carImageUrl(car)} alt={`${car.make} ${car.model}`} width={520} height={360} /></div>
             <div className="admin-card-info">
