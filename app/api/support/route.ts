@@ -1,9 +1,11 @@
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
 import { and, count, eq, gte, sql } from 'drizzle-orm'
 import { NextResponse, type NextRequest } from 'next/server'
+import { auth } from '@/lib/auth'
 import { getClientAddress } from '@/lib/rate-limit'
 import { db } from '@/lib/db'
 import { supportTickets, type SupportCategory } from '@/lib/db/schema'
+import { isValidPhoneNumber, normalizePhoneNumber } from '@/lib/phone'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,9 +91,10 @@ function createWhatsAppUrl(name: string, category: SupportCategory, message: str
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    return NextResponse.json(createChallenge(), { headers: { 'Cache-Control': 'no-store, max-age=0' } })
+    const session = await auth.api.getSession({ headers: request.headers })
+    return NextResponse.json({ ...createChallenge(), phoneNumber: session?.user.phoneNumber ?? '' }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch {
     return NextResponse.json({ message: 'خدمة التحقق غير متاحة حالياً.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
   }
@@ -112,13 +115,14 @@ export async function POST(request: NextRequest) {
 
   const values = body as Record<string, unknown>
   const name = cleanText(values.name, 120)
+  const whatsappNumber = normalizePhoneNumber(cleanText(values.whatsappNumber, 32))
   const message = cleanText(values.message, 500)
   const category = values.category
   const answer = normalizeDigits(cleanText(values.captchaAnswer, 4))
   const challenge = typeof values.challengeId === 'string' ? verifyChallenge(values.challengeId) : null
 
-  if (name.length < 2 || message.length < 10 || typeof category !== 'string' || !categories.has(category as SupportCategory)) {
-    return NextResponse.json({ message: 'تحقق من الاسم ونوع الطلب والتفاصيل.' }, { status: 400 })
+  if (name.length < 2 || !isValidPhoneNumber(whatsappNumber) || message.length < 10 || typeof category !== 'string' || !categories.has(category as SupportCategory)) {
+    return NextResponse.json({ message: 'تحقق من الاسم ورقم واتساب ونوع الطلب والتفاصيل.' }, { status: 400 })
   }
   if (!challenge || !/^\d{1,2}$/.test(answer) || Number(answer) !== challenge.first + challenge.second) {
     return NextResponse.json({ message: 'إجابة التحقق غير صحيحة أو انتهت صلاحيتها. حدّث النافذة وحاول مرة أخرى.' }, { status: 400 })
@@ -138,6 +142,7 @@ export async function POST(request: NextRequest) {
         const [ticket] = await transaction.insert(supportTickets).values({
           reference,
           fullName: name,
+          whatsappNumber,
           category: category as SupportCategory,
           message,
           ipHash,

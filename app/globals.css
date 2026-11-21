@@ -807,9 +807,16 @@ select.plain-input { appearance: auto; }
 .support-ticket-date { display: inline-flex; align-items: center; gap: 6px; color: #8b938a; font-size: 10px; }
 .support-ticket-date svg { width: 13px; height: 13px; }
 .support-ticket-card h2 { margin: 0 0 8px; color: #2f4035; font-size: 16px; }
+.support-ticket-phone { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; color: #6f7d72; font-size: 11px; }
+.support-ticket-phone bdi { color: #33483a; font-weight: 700; }
 .support-ticket-message { margin: 0; color: #69756b; font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
 .support-ticket-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 14px; border-top: 1px solid #e8eae4; padding-top: 11px; color: #8b938a; font-size: 10px; }
 .support-ticket-actions strong { margin-inline-start: 5px; color: #596a5d; }
+.support-ticket-action-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.support-whatsapp-reply { min-height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #078052; border-radius: 8px; padding: 0 10px; background: #078052; color: #fff; font-size: 10px; font-weight: 700; text-decoration: none; }
+.support-whatsapp-reply:hover { border-color: #065f46; background: #065f46; }
+.support-whatsapp-reply:focus-visible { outline: 3px solid rgba(7, 128, 82, .3); outline-offset: 2px; }
+.support-whatsapp-reply svg { width: 14px; height: 14px; }
 .support-ticket-actions .admin-permanent-delete { min-height: 32px; }
 
 @media (max-width: 760px) {

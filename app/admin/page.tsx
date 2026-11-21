@@ -16,7 +16,7 @@ export default async function AdminPage() {
     db.select().from(carListings).where(eq(carListings.status, 'pending')).orderBy(asc(carListings.createdAt)),
     db.select().from(carListings).where(eq(carListings.status, 'approved')).orderBy(desc(carListings.updatedAt)),
     db.select().from(carListings).where(eq(carListings.status, 'archived')).orderBy(desc(carListings.updatedAt)),
-    db.select({ id: supportTickets.id, reference: supportTickets.reference, fullName: supportTickets.fullName, category: supportTickets.category, message: supportTickets.message, createdAt: supportTickets.createdAt }).from(supportTickets).orderBy(desc(supportTickets.createdAt)),
+    db.select({ id: supportTickets.id, reference: supportTickets.reference, fullName: supportTickets.fullName, whatsappNumber: supportTickets.whatsappNumber, category: supportTickets.category, message: supportTickets.message, createdAt: supportTickets.createdAt }).from(supportTickets).orderBy(desc(supportTickets.createdAt)),
   ])
 
   return <AdminDashboard listings={pending} publishedListings={published} archivedListings={archived} supportTickets={support} />

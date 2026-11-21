@@ -14,6 +14,14 @@ const categoryLabels: Record<SupportCategory, string> = {
 
 const ticketDate = new Intl.DateTimeFormat('ar-SY', { dateStyle: 'medium', timeStyle: 'short' })
 
+function whatsappReplyUrl(ticket: AdminSupportTicket) {
+  if (!ticket.whatsappNumber) return null
+  const phone = ticket.whatsappNumber.replace(/\D/g, '')
+  if (!/^[1-9]\d{7,14}$/.test(phone)) return null
+  const text = `مرحباً ${ticket.fullName}، بخصوص طلب الدعم رقم #${ticket.reference}، وصلنا طلبك وسنتابع معك هنا.`
+  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+}
+
 export function SupportInbox({ tickets }: { tickets: AdminSupportTicket[] }) {
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -48,22 +56,29 @@ export function SupportInbox({ tickets }: { tickets: AdminSupportTicket[] }) {
     <section className="support-inbox" aria-label="طلبات الدعم الواردة">
       {feedback && <p className="form-success admin-feedback" role="status">{feedback}</p>}
       <div className="support-ticket-list">
-        {tickets.map((ticket) => (
-          <article className="support-ticket-card" key={ticket.id}>
-            <header className="support-ticket-header">
-              <div><span className="support-ticket-reference" dir="ltr">{ticket.reference}</span><span className="support-ticket-category">{categoryLabels[ticket.category]}</span></div>
-              <time className="support-ticket-date" dateTime={ticket.createdAt.toISOString()}><CalendarClock aria-hidden="true" />{ticketDate.format(ticket.createdAt)}</time>
-            </header>
-            <h2>{ticket.fullName}</h2>
-            <p className="support-ticket-message">{ticket.message}</p>
-            <footer className="support-ticket-actions">
-              <span>رقم الطلب <strong dir="ltr">{ticket.reference}</strong></span>
-              <button className="admin-permanent-delete" type="button" disabled={deletingId !== null} onClick={() => deleteTicket(ticket)}>
-                <Trash2 aria-hidden="true" />{deletingId === ticket.id ? 'جارٍ الحذف…' : 'حذف الطلب'}
-              </button>
-            </footer>
-          </article>
-        ))}
+        {tickets.map((ticket) => {
+          const replyUrl = whatsappReplyUrl(ticket)
+          return (
+            <article className="support-ticket-card" key={ticket.id}>
+              <header className="support-ticket-header">
+                <div><span className="support-ticket-reference" dir="ltr">{ticket.reference}</span><span className="support-ticket-category">{categoryLabels[ticket.category]}</span></div>
+                <time className="support-ticket-date" dateTime={ticket.createdAt.toISOString()}><CalendarClock aria-hidden="true" />{ticketDate.format(ticket.createdAt)}</time>
+              </header>
+              <h2>{ticket.fullName}</h2>
+              <p className="support-ticket-phone">واتساب المستخدم <bdi dir="ltr">{ticket.whatsappNumber ?? 'غير متوفر'}</bdi></p>
+              <p className="support-ticket-message">{ticket.message}</p>
+              <footer className="support-ticket-actions">
+                <span>رقم الطلب <strong dir="ltr">{ticket.reference}</strong></span>
+                <div className="support-ticket-action-links">
+                  {replyUrl && <a className="support-whatsapp-reply" href={replyUrl} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden="true" />رد عبر واتساب</a>}
+                  <button className="admin-permanent-delete" type="button" disabled={deletingId !== null} onClick={() => deleteTicket(ticket)}>
+                    <Trash2 aria-hidden="true" />{deletingId === ticket.id ? 'جارٍ الحذف…' : 'حذف الطلب'}
+                  </button>
+                </div>
+              </footer>
+            </article>
+          )
+        })}
       </div>
     </section>
   )

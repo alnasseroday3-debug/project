@@ -62,6 +62,7 @@ export const supportTickets = pgTable('support_tickets', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   reference: varchar('reference', { length: 32 }).notNull().unique(),
   fullName: varchar('full_name', { length: 120 }).notNull(),
+  whatsappNumber: varchar('whatsapp_number', { length: 32 }),
   category: varchar('category', { length: 40 }).$type<SupportCategory>().notNull(),
   message: varchar('message', { length: 500 }).notNull(),
   ipHash: varchar('ip_hash', { length: 64 }).notNull(),
@@ -73,7 +74,7 @@ export const supportTickets = pgTable('support_tickets', {
 ])
 
 export type SupportTicket = typeof supportTickets.$inferSelect
-export type AdminSupportTicket = Pick<SupportTicket, 'id' | 'reference' | 'fullName' | 'category' | 'message' | 'createdAt'>
+export type AdminSupportTicket = Pick<SupportTicket, 'id' | 'reference' | 'fullName' | 'whatsappNumber' | 'category' | 'message' | 'createdAt'>
 
 export const carListings = pgTable('car_listings', {
   id: text('id').primaryKey(),

@@ -14,6 +14,7 @@ export type AuthUser = {
   emailVerified: boolean
   role: string
   image: string | null
+  phoneNumber: string | null
 }
 
 type HeaderReader = { get(name: string): string | null }
@@ -100,6 +101,7 @@ async function getSession({ headers }: { headers: HeaderReader }) {
       emailVerified: user.emailVerified,
       role: user.role,
       image: user.image,
+      phoneNumber: user.phoneNumber,
       expiresAt: sessionTable.expiresAt,
     })
     .from(sessionTable)
@@ -122,6 +124,7 @@ async function getSession({ headers }: { headers: HeaderReader }) {
       emailVerified: record.emailVerified,
       role: roleForSession(record.email, record.role),
       image: record.image,
+      phoneNumber: record.phoneNumber,
     } satisfies AuthUser,
   }
 }

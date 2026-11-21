@@ -18,6 +18,7 @@ export function SupportContact({ location }: { location: 'footer' | 'navigation'
   const dialogRef = useRef<HTMLDialogElement>(null)
   const formId = useId()
   const [name, setName] = useState('')
+  const [whatsappNumber, setWhatsappNumber] = useState('')
   const [category, setCategory] = useState<SupportCategory>('general_inquiry')
   const [message, setMessage] = useState('')
   const [captchaAnswer, setCaptchaAnswer] = useState('')
@@ -35,15 +36,17 @@ export function SupportContact({ location }: { location: 'footer' | 'navigation'
     setSubmission(null)
     setCaptchaAnswer('')
     setChallenge(null)
+    setWhatsappNumber('')
     setIsLoadingChallenge(true)
 
     try {
       const response = await fetch('/api/support', { cache: 'no-store' })
       const result: unknown = await response.json()
-      if (!response.ok || !result || typeof result !== 'object' || !('challengeId' in result) || !('question' in result) || typeof result.challengeId !== 'string' || typeof result.question !== 'string') {
+      if (!response.ok || !result || typeof result !== 'object' || !('challengeId' in result) || !('question' in result) || !('phoneNumber' in result) || typeof result.challengeId !== 'string' || typeof result.question !== 'string' || typeof result.phoneNumber !== 'string') {
         throw new Error('تعذّر تحميل سؤال التحقق. حاول مرة أخرى.')
       }
       setChallenge({ challengeId: result.challengeId, question: result.question })
+      setWhatsappNumber(result.phoneNumber)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذّر تحميل سؤال التحقق.')
     } finally {
@@ -69,7 +72,7 @@ export function SupportContact({ location }: { location: 'footer' | 'navigation'
       const response = await fetch('/api/support', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, category, message, captchaAnswer, challengeId: challenge.challengeId }),
+        body: JSON.stringify({ name, whatsappNumber, category, message, captchaAnswer, challengeId: challenge.challengeId }),
       })
       const result: unknown = await response.json()
       if (!response.ok || !result || typeof result !== 'object' || !('reference' in result) || typeof result.reference !== 'string' || !('whatsappUrl' in result) || (typeof result.whatsappUrl !== 'string' && result.whatsappUrl !== null)) {
@@ -122,6 +125,10 @@ export function SupportContact({ location }: { location: 'footer' | 'navigation'
             <label className="support-field" htmlFor={`${formId}-name`}>
               <span>الاسم</span>
               <input id={`${formId}-name`} name="name" autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} minLength={2} required disabled={isSubmitting} placeholder="الاسم الذي تود أن نناديك به" />
+            </label>
+            <label className="support-field" htmlFor={`${formId}-whatsapp`}>
+              <span>رقم واتساب المستخدم</span>
+              <input id={`${formId}-whatsapp`} name="whatsappNumber" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={whatsappNumber} onChange={(event) => setWhatsappNumber(event.target.value)} maxLength={32} required disabled={isSubmitting} placeholder="مثال: +963 9XX XXX XXX" />
             </label>
             <label className="support-field" htmlFor={`${formId}-category`}>
               <span>نوع الطلب</span>
