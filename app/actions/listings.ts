@@ -1,5 +1,6 @@
 'use server'
 
+import { and, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -28,6 +29,7 @@ type ListingDraft = {
   description: string
   sellerPhone: string
   images: string[]
+  verificationImageUpdated?: boolean
 }
 
 const cleanText = (value: unknown, maxLength: number) =>
@@ -114,9 +116,117 @@ export async function submitListing(draft: ListingDraft) {
     cookieStore.delete(verificationUploadCookie)
     revalidatePath('/')
     revalidatePath('/admin')
+    revalidatePath('/my-listings')
     return { success: true, message: 'وصل إعلانك إلى فريق مَسَار للمراجعة.' }
   } catch (error) {
     console.error('[v0] Failed to create car listing:', error)
     return { success: false, message: 'تعذّر حفظ الإعلان الآن. حاول مرة أخرى.' }
+  }
+}
+
+export async function resubmitRejectedListing(listingId: string, draft: ListingDraft) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { success: false, message: 'سجّل الدخول أولاً لإعادة إرسال إعلانك.' }
+  if (typeof listingId !== 'string' || !listingId || listingId.length > 80 || !draft || typeof draft !== 'object') {
+    return { success: false, message: 'بيانات الإعلان غير صالحة.' }
+  }
+
+  const cookieStore = await cookies()
+  const uploadedVerificationImage = draft.verificationImageUpdated ? cookieStore.get(verificationUploadCookie)?.value : undefined
+
+  try {
+    const [listing] = await db
+      .select({ verificationImage: carListings.verificationImage })
+      .from(carListings)
+      .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'rejected')))
+      .limit(1)
+    if (!listing) return { success: false, message: 'لا يمكن تعديل هذا الإعلان؛ تأكد أنه مرفوض ومن حسابك.' }
+
+    const requestHeaders = await headers()
+    const limits = await Promise.all([
+      consumeRateLimit('listing-resubmit-user', session.user.id, 3, 15 * 60_000),
+      consumeRateLimit('listing-resubmit-ip', getClientAddress(requestHeaders), 10, 60 * 60_000),
+    ])
+    if (limits.some((allowed) => !allowed)) return { success: false, message: 'تجاوزت حد إعادة إرسال الإعلانات. حاول لاحقاً.' }
+
+    if (draft.verificationImageUpdated && !uploadedVerificationImage) {
+      return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
+    }
+    if (uploadedVerificationImage && !isOwnedPublicBlobUrl(uploadedVerificationImage, 'verification', session.user.id)) {
+      return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
+    }
+    const verificationImage = uploadedVerificationImage || listing.verificationImage || undefined
+    const make = cleanText(draft.make, 50)
+    const model = cleanText(draft.model, 60)
+    const city = cleanText(draft.city, 60)
+    const sellerPhone = cleanText(draft.sellerPhone, 20).replace(/[\s()-]/g, '')
+    const description = cleanText(draft.description, 1200)
+    const images = Array.isArray(draft.images) ? draft.images : []
+    const phoneIsValid = /^\+?[1-9]\d{7,14}$/.test(sellerPhone)
+    const priceIsValid = isWholeNumber(draft.askingPrice, 1000, 100_000_000)
+    const yearIsValid = isWholeNumber(draft.year, 1980, new Date().getFullYear() + 1)
+    const conditionIsValid = draft.condition === 'new' || draft.condition === 'used'
+    const mileageIsValid = isWholeNumber(draft.mileage, 0, 2_000_000)
+    const monthsIsValid = draft.condition === 'new' || isWholeNumber(draft.usageMonths, 0, 1200)
+    const booleansAreValid = typeof draft.maintenanceVisited === 'boolean' && typeof draft.repaired === 'boolean' && typeof draft.partsChanged === 'boolean'
+    const negotiationIsValid = (value: unknown) => value === null || isWholeNumber(value, 1000, 100_000_000)
+
+    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid) {
+      return { success: false, message: 'راجِع بيانات السيارة والسعر ورقم التواصل.' }
+    }
+    if (!negotiationIsValid(draft.negotiationMin) || !negotiationIsValid(draft.negotiationMax) || images.length < 1 || images.length > 6) {
+      return { success: false, message: 'أضف من صورة واحدة إلى 6 صور، وتحقق من نطاق السعر.' }
+    }
+    if (draft.negotiationMin && draft.negotiationMax && draft.negotiationMin > draft.negotiationMax) {
+      return { success: false, message: 'الحد الأدنى للتفاوض يجب أن يكون أقل من الحد الأعلى.' }
+    }
+    if (new Set(images).size !== images.length || images.some((url) => typeof url !== 'string' || !isOwnedPublicBlobUrl(url, 'cars', session.user.id))) {
+      return { success: false, message: 'أعد رفع صور السيارة من حسابك.' }
+    }
+    if (!verificationImage || !isOwnedPublicBlobUrl(verificationImage, 'verification', session.user.id)) {
+      return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
+    }
+
+    const updated = await db
+      .update(carListings)
+      .set({
+        make,
+        model,
+        year: draft.year,
+        condition: draft.condition,
+        mileage: draft.condition === 'new' ? 0 : draft.mileage,
+        usageMonths: draft.condition === 'used' ? draft.usageMonths ?? 0 : 0,
+        maintenanceVisited: draft.maintenanceVisited,
+        maintenanceReason: draft.maintenanceVisited ? cleanText(draft.maintenanceReason, 500) || null : null,
+        repaired: draft.repaired,
+        repairDetails: draft.repaired ? cleanText(draft.repairDetails, 500) || null : null,
+        partsChanged: draft.partsChanged,
+        changedParts: draft.partsChanged ? cleanText(draft.changedParts, 500) || null : null,
+        askingPrice: draft.askingPrice,
+        negotiationMin: draft.negotiationMin,
+        negotiationMax: draft.negotiationMax,
+        city,
+        description: description || null,
+        sellerPhone,
+        images,
+        verificationImage,
+        verified: false,
+        status: 'pending',
+        rejectionReason: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'rejected')))
+      .returning({ id: carListings.id })
+
+    if (updated.length === 0) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }
+    if (draft.verificationImageUpdated) cookieStore.delete(verificationUploadCookie)
+    revalidatePath('/')
+    revalidatePath('/admin')
+    revalidatePath('/my-listings')
+    revalidatePath(`/cars/${listingId}`)
+    return { success: true, message: 'تم تحديث إعلانك وإرساله مجدداً إلى فريق مَسَار للمراجعة.' }
+  } catch (error) {
+    console.error('[v0] Failed to resubmit car listing:', error)
+    return { success: false, message: 'تعذّر إعادة إرسال الإعلان الآن. حاول مرة أخرى.' }
   }
 }

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ImagePlus, ShieldCheck, X } from 'lucide-react'
-import { submitListing } from '@/app/actions/listings'
+import { resubmitRejectedListing, submitListing } from '@/app/actions/listings'
 import { compressImage, MAX_IMAGE_SOURCE_BYTES } from '@/lib/compress-image'
 
 const steps = [
@@ -17,27 +17,53 @@ const steps = [
 
 const currentYear = new Date().getFullYear()
 
-export function ListingWizard({ userName }: { userName: string }) {
+type ListingForEdit = {
+  id: string
+  make: string
+  model: string
+  year: number
+  condition: 'new' | 'used'
+  mileage: number
+  usageMonths: number | null
+  maintenanceVisited: boolean
+  maintenanceReason: string | null
+  repaired: boolean
+  repairDetails: string | null
+  partsChanged: boolean
+  changedParts: string | null
+  askingPrice: number
+  negotiationMin: number | null
+  negotiationMax: number | null
+  city: string | null
+  description: string | null
+  sellerPhone: string | null
+  images: string[]
+  hasVerificationImage: boolean
+}
+
+export function ListingWizard({ userName, existingListing }: { userName: string; existingListing?: ListingForEdit }) {
   const router = useRouter()
+  const isEditing = Boolean(existingListing)
   const [step, setStep] = useState(0)
-  const [make, setMake] = useState('')
-  const [model, setModel] = useState('')
-  const [year, setYear] = useState(String(currentYear))
-  const [condition, setCondition] = useState<'new' | 'used'>('used')
-  const [mileage, setMileage] = useState('')
-  const [usageMonths, setUsageMonths] = useState('')
-  const [maintenanceVisited, setMaintenanceVisited] = useState('yes')
-  const [maintenanceReason, setMaintenanceReason] = useState('')
-  const [repaired, setRepaired] = useState('no')
-  const [repairDetails, setRepairDetails] = useState('')
-  const [partsChanged, setPartsChanged] = useState('no')
-  const [changedParts, setChangedParts] = useState('')
-  const [askingPrice, setAskingPrice] = useState('')
-  const [negotiationMin, setNegotiationMin] = useState('')
-  const [negotiationMax, setNegotiationMax] = useState('')
-  const [city, setCity] = useState('')
-  const [description, setDescription] = useState('')
-  const [sellerPhone, setSellerPhone] = useState('')
+  const [make, setMake] = useState(existingListing?.make ?? '')
+  const [model, setModel] = useState(existingListing?.model ?? '')
+  const [year, setYear] = useState(String(existingListing?.year ?? currentYear))
+  const [condition, setCondition] = useState<'new' | 'used'>(existingListing?.condition ?? 'used')
+  const [mileage, setMileage] = useState(String(existingListing?.mileage ?? ''))
+  const [usageMonths, setUsageMonths] = useState(String(existingListing?.usageMonths ?? ''))
+  const [maintenanceVisited, setMaintenanceVisited] = useState(existingListing ? (existingListing.maintenanceVisited ? 'yes' : 'no') : 'yes')
+  const [maintenanceReason, setMaintenanceReason] = useState(existingListing?.maintenanceReason ?? '')
+  const [repaired, setRepaired] = useState(existingListing ? (existingListing.repaired ? 'yes' : 'no') : 'no')
+  const [repairDetails, setRepairDetails] = useState(existingListing?.repairDetails ?? '')
+  const [partsChanged, setPartsChanged] = useState(existingListing ? (existingListing.partsChanged ? 'yes' : 'no') : 'no')
+  const [changedParts, setChangedParts] = useState(existingListing?.changedParts ?? '')
+  const [askingPrice, setAskingPrice] = useState(String(existingListing?.askingPrice ?? ''))
+  const [negotiationMin, setNegotiationMin] = useState(String(existingListing?.negotiationMin ?? ''))
+  const [negotiationMax, setNegotiationMax] = useState(String(existingListing?.negotiationMax ?? ''))
+  const [city, setCity] = useState(existingListing?.city ?? '')
+  const [description, setDescription] = useState(existingListing?.description ?? '')
+  const [sellerPhone, setSellerPhone] = useState(existingListing?.sellerPhone ?? '')
+  const [existingImages, setExistingImages] = useState<string[]>(existingListing?.images ?? [])
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const [verificationFile, setVerificationFile] = useState<File | null>(null)
@@ -55,8 +81,8 @@ export function ListingWizard({ userName }: { userName: string }) {
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget
     const selected = Array.from(input.files || [])
-    if (selected.length > 6) {
-      setError('يمكنك رفع 6 صور كحد أقصى.')
+    if (selected.length + existingImages.length > 6) {
+      setError('يمكنك الاحتفاظ بما مجموعه 6 صور كحد أقصى.')
       input.value = ''
       return
     }
@@ -84,6 +110,10 @@ export function ListingWizard({ userName }: { userName: string }) {
   function removeImage(index: number) {
     setFiles((current) => current.filter((_, currentIndex) => currentIndex !== index))
     setPreviews((current) => current.filter((_, currentIndex) => currentIndex !== index))
+  }
+
+  function removeExistingImage(index: number) {
+    setExistingImages((current) => current.filter((_, currentIndex) => currentIndex !== index))
   }
 
   async function handleVerificationFile(event: ChangeEvent<HTMLInputElement>) {
@@ -123,16 +153,18 @@ export function ListingWizard({ userName }: { userName: string }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy || compressing || files.length === 0 || !verificationFile) {
-      if (!files.length) setError('أضف صورة واحدة على الأقل للسيارة.')
-      else if (!verificationFile) setError('أضف صورة التحقق وإثبات الجدية للمتابعة.')
+    const imageCount = existingImages.length + files.length
+    const hasVerificationImage = Boolean(existingListing?.hasVerificationImage || verificationFile)
+    if (busy || compressing || imageCount === 0 || !hasVerificationImage) {
+      if (imageCount === 0) setError('أضف صورة واحدة على الأقل للسيارة.')
+      else if (!hasVerificationImage) setError('أضف صورة التحقق وإثبات الجدية للمتابعة.')
       return
     }
     setBusy(true)
     setError('')
 
     try {
-      const imagePaths: string[] = []
+      const imagePaths = [...existingImages]
       for (const file of files) {
         const uploadForm = new FormData()
         uploadForm.append('file', file)
@@ -143,14 +175,16 @@ export function ListingWizard({ userName }: { userName: string }) {
         imagePaths.push(result.url)
       }
 
-      const verificationForm = new FormData()
-      verificationForm.append('file', verificationFile)
-      verificationForm.append('kind', 'verification')
-      const verificationResponse = await fetch('/api/uploads', { method: 'POST', body: verificationForm })
-      const verificationResult = await verificationResponse.json()
-      if (!verificationResponse.ok) throw new Error(verificationResult.error || 'تعذّر رفع صورة التحقق.')
+      if (verificationFile) {
+        const verificationForm = new FormData()
+        verificationForm.append('file', verificationFile)
+        verificationForm.append('kind', 'verification')
+        const verificationResponse = await fetch('/api/uploads', { method: 'POST', body: verificationForm })
+        const verificationResult = await verificationResponse.json()
+        if (!verificationResponse.ok) throw new Error(verificationResult.error || 'تعذّر رفع صورة التحقق.')
+      }
 
-      const result = await submitListing({
+      const draft = {
         make,
         model,
         year: Number(year),
@@ -170,7 +204,11 @@ export function ListingWizard({ userName }: { userName: string }) {
         description,
         sellerPhone,
         images: imagePaths,
-      })
+        verificationImageUpdated: Boolean(verificationFile),
+      }
+      const result = existingListing
+        ? await resubmitRejectedListing(existingListing.id, draft)
+        : await submitListing(draft)
       if (!result.success) throw new Error(result.message)
       setComplete(true)
       router.refresh()
@@ -187,9 +225,9 @@ export function ListingWizard({ userName }: { userName: string }) {
         <section className="submission-success">
           <span className="success-icon"><CheckCircle2 aria-hidden="true" /></span>
           <span className="eyebrow eyebrow-green">وصلنا إعلانك يا {userName.split(' ')[0]}</span>
-          <h1>خطوة وتكمل الحكاية.</h1>
-          <p>إعلانك الآن عند فريق مَسَار للمراجعة. بنخبرك أول ما يصير جاهزاً للعرض.</p>
-          <div className="success-actions"><Link className="primary-button" href="/">العودة للسوق <ArrowLeft aria-hidden="true" /></Link><Link className="quiet-link" href="/admin">لوحة المراجعة</Link></div>
+          <h1>{isEditing ? 'عاد إعلانك للمراجعة.' : 'خطوة وتكمل الحكاية.'}</h1>
+          <p>{isEditing ? 'تم حفظ التعديلات وإرسال الإعلان مجدداً إلى فريق مَسَار.' : 'إعلانك الآن عند فريق مَسَار للمراجعة. بنخبرك أول ما يصير جاهزاً للعرض.'}</p>
+          <div className="success-actions"><Link className="primary-button" href={isEditing ? '/my-listings' : '/'}>{isEditing ? 'العودة إلى إعلاناتي' : 'العودة للسوق'} <ArrowLeft aria-hidden="true" /></Link></div>
         </section>
       </main>
     )
@@ -197,8 +235,8 @@ export function ListingWizard({ userName }: { userName: string }) {
 
   return (
     <main className="wizard-page page-container">
-      <div className="wizard-breadcrumb"><Link href="/">الرئيسية</Link><span>/</span><span>أضف إعلانك</span></div>
-      <div className="wizard-heading"><div><span className="eyebrow eyebrow-green">إعلان جديد</span><h1>خلّ سيارتك تلقى طريقها.</h1><p>أضف التفاصيل بوضوح، وفريقنا يتولى مراجعة الإعلان قبل نشره.</p></div><div className="wizard-trust"><ShieldCheck aria-hidden="true" /><span>مراجعة مجانية<br /><strong>قبل النشر</strong></span></div></div>
+      <div className="wizard-breadcrumb"><Link href="/">الرئيسية</Link><span>/</span><Link href="/my-listings">إعلاناتي</Link><span>/</span><span>{isEditing ? 'تعديل وإعادة إرسال' : 'أضف إعلانك'}</span></div>
+      <div className="wizard-heading"><div><span className="eyebrow eyebrow-green">{isEditing ? 'تعديل إعلان مرفوض' : 'إعلان جديد'}</span><h1>{isEditing ? 'حدّث تفاصيل سيارتك.' : 'خلّ سيارتك تلقى طريقها.'}</h1><p>{isEditing ? 'صحّح التفاصيل أو حدّث الصور، ثم أعد إرسال الإعلان للمراجعة.' : 'أضف التفاصيل بوضوح، وفريقنا يتولى مراجعة الإعلان قبل نشره.'}</p></div><div className="wizard-trust"><ShieldCheck aria-hidden="true" /><span>مراجعة مجانية<br /><strong>قبل النشر</strong></span></div></div>
 
       <div className="wizard-layout">
         <aside className="wizard-steps" aria-label="مراحل إضافة الإعلان">
@@ -259,18 +297,22 @@ export function ListingWizard({ userName }: { userName: string }) {
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={compressing || busy} onChange={handleFiles} aria-label="اختر صور السيارة" />
               <span className="upload-icon"><ImagePlus aria-hidden="true" /></span>
               <strong>اسحب الصور هنا أو اخترها من جهازك</strong>
-              <small>حتى 6 صور · تُضغط تلقائياً إلى أقل من 500 كيلوبايت للصورة</small>
+              <small>حتى 6 صور · المحفوظ: {existingImages.length} · تُضغط الصور الجديدة تلقائياً إلى أقل من 500 كيلوبايت للصورة</small>
               <span className="upload-button"><Camera aria-hidden="true" /> اختيار الصور</span>
             </label>
-            {previews.length > 0 && <div className="image-preview-grid">{previews.map((preview, index) => <div className="image-preview" key={preview}><Image src={preview} alt={`معاينة صورة السيارة ${index + 1}`} width={240} height={180} unoptimized /><button type="button" aria-label={`حذف الصورة ${index + 1}`} onClick={() => removeImage(index)}><X aria-hidden="true" /></button></div>)}</div>}
+            {(existingImages.length > 0 || previews.length > 0) && <div className="image-preview-grid">
+              {existingImages.map((image, index) => <div className="image-preview" key={`existing-${image}`}><Image src={image} alt={`صورة السيارة المحفوظة ${index + 1}`} width={240} height={180} unoptimized /><button type="button" aria-label={`إزالة الصورة المحفوظة ${index + 1}`} onClick={() => removeExistingImage(index)}><X aria-hidden="true" /></button></div>)}
+              {previews.map((preview, index) => <div className="image-preview" key={preview}><Image src={preview} alt={`معاينة صورة السيارة الجديدة ${index + 1}`} width={240} height={180} unoptimized /><button type="button" aria-label={`حذف الصورة الجديدة ${index + 1}`} onClick={() => removeImage(index)}><X aria-hidden="true" /></button></div>)}
+            </div>}
             <div className="upload-privacy"><ShieldCheck aria-hidden="true" /><span>صور السيارة فقط ستظهر للمشترين بعد الموافقة على الإعلان.</span></div>
             <label className="upload-dropzone verification-upload">
-              <input type="file" accept="image/jpeg,image/png,image/webp" disabled={compressing || busy} onChange={handleVerificationFile} aria-label="صورة التحقق وإثبات الجدية" required />
+              <input type="file" accept="image/jpeg,image/png,image/webp" disabled={compressing || busy} onChange={handleVerificationFile} aria-label="صورة التحقق وإثبات الجدية" required={!existingListing?.hasVerificationImage} />
               <span className="upload-icon"><ShieldCheck aria-hidden="true" /></span>
               <strong>صورة التحقق وإثبات الجدية <span aria-hidden="true">(مطلوبة)</span></strong>
               <small>صوّر السيارة مع ورقة مكتوب عليها «مسار» وتاريخ اليوم، أو صورة لميكانيك السيارة مع إخفاء المعلومات الشخصية. تُضغط الصورة تلقائياً لأقل من 500 كيلوبايت.</small>
               <span className="upload-button"><Camera aria-hidden="true" /> {verificationFile ? 'تغيير صورة التحقق' : 'اختيار صورة التحقق'}</span>
             </label>
+            {existingListing?.hasVerificationImage && !verificationFile && <p className="existing-verification-note"><ShieldCheck aria-hidden="true" /> صورة التحقق الحالية محفوظة. يمكنك الاحتفاظ بها أو رفع صورة أوضح لاستبدالها.</p>}
             {verificationPreview && <div className="verification-preview"><Image src={verificationPreview} alt="معاينة صورة التحقق التي ستظهر للإدارة فقط" width={480} height={320} unoptimized /><span>صورة خاصة بالإدارة فقط</span></div>}
             <div className="upload-privacy verification-privacy"><ShieldCheck aria-hidden="true" /><span>هذه الصورة لا تُنشر للعامة، ولا يطّلع عليها إلا فريق إدارة مَسَار للمراجعة.</span></div>
           </div>
@@ -278,7 +320,7 @@ export function ListingWizard({ userName }: { userName: string }) {
           {error && <p className="form-alert wizard-alert" role="alert">{error}</p>}
           <div className="wizard-actions">
             {step > 0 ? <button className="wizard-back" type="button" onClick={() => { setError(''); setStep((current) => current - 1) }}><ArrowRight aria-hidden="true" /> رجوع</button> : <span />}
-            {step < steps.length - 1 ? <button className="primary-button wizard-next" type="button" onClick={goNext}>الخطوة التالية <ArrowLeft aria-hidden="true" /></button> : <button className="primary-button wizard-next" type="submit" disabled={busy || compressing || !files.length || !verificationFile}>{compressing ? 'جارٍ ضغط الصور…' : busy ? 'جارٍ رفع الصور…' : 'إرسال للمراجعة'} {busy || compressing ? <span className="button-spinner" /> : <ArrowLeft aria-hidden="true" />}</button>}
+            {step < steps.length - 1 ? <button className="primary-button wizard-next" type="button" onClick={goNext}>الخطوة التالية <ArrowLeft aria-hidden="true" /></button> : <button className="primary-button wizard-next" type="submit" disabled={busy || compressing || existingImages.length + files.length === 0 || (!existingListing?.hasVerificationImage && !verificationFile)}>{compressing ? 'جارٍ ضغط الصور…' : busy ? 'جارٍ رفع الصور…' : isEditing ? 'إعادة الإرسال للمراجعة' : 'إرسال للمراجعة'} {busy || compressing ? <span className="button-spinner" /> : <ArrowLeft aria-hidden="true" />}</button>}
           </div>
         </form>
       </div>

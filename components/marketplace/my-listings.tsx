@@ -10,7 +10,7 @@ const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
 const listingStatus = {
   pending: { label: 'قيد المراجعة', className: 'my-listing-status is-pending', icon: Clock3 },
-  approved: { label: 'منشور', className: 'my-listing-status is-approved', icon: BadgeCheck },
+  approved: { label: 'مقبول ومنشور', className: 'my-listing-status is-approved', icon: BadgeCheck },
   rejected: { label: 'مرفوض', className: 'my-listing-status is-rejected', icon: XCircle },
 } as const
 
@@ -32,7 +32,13 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
               <p className="listing-make">{car.make}</p>
               <h2>{car.model}</h2>
               <p className="my-listing-price" dir="ltr">${money.format(car.askingPrice)} USD</p>
-              {car.status === 'approved' ? <Link className="my-listing-link" href={`/cars/${car.id}`}>عرض الإعلان المنشور <ArrowLeft aria-hidden="true" /></Link> : <span className="my-listing-note">{car.status === 'rejected' ? 'يمكنك التواصل مع فريقنا لمراجعة القرار.' : 'سيظهر إعلانك في السوق بعد اكتمال المراجعة.'}</span>}
+              {car.status === 'approved' ? <Link className="my-listing-link" href={`/cars/${car.id}`}>مشاهدة الإعلان <ArrowLeft aria-hidden="true" /></Link> : car.status === 'rejected' ? <>
+                <section className="my-listing-rejection" aria-label="سبب الرفض من الإدارة">
+                  <strong>سبب الرفض من الإدارة</strong>
+                  <p>{car.rejectionReason || 'لم يوضح فريق الإدارة سبب الرفض. يمكنك تعديل الإعلان وإعادة إرساله للمراجعة.'}</p>
+                </section>
+                <Link className="my-listing-edit" href={`/my-listings/${encodeURIComponent(car.id)}/edit`}>تعديل الإعلان وإعادة الإرسال <ArrowLeft aria-hidden="true" /></Link>
+              </> : <span className="my-listing-note">سيظهر إعلانك في السوق بعد اكتمال المراجعة.</span>}
             </div>
           </article>
         )

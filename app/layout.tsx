@@ -42,6 +42,14 @@ export default async function RootLayout({
   const session = await getCurrentSession()
   const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified, session.user.role))
   let pendingCount = 0
+  let myListingsCount = 0
+  if (session?.user) {
+    const [result] = await db
+      .select({ total: count() })
+      .from(carListings)
+      .where(eq(carListings.userId, session.user.id))
+    myListingsCount = result?.total ?? 0
+  }
   if (isAdmin) {
     const [result] = await db
       .select({ total: count() })
@@ -53,7 +61,7 @@ export default async function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className="antialiased">
-        <SiteHeader isAdmin={isAdmin} pendingCount={pendingCount} sessionUser={session?.user ?? null} />
+        <SiteHeader isAdmin={isAdmin} pendingCount={pendingCount} myListingsCount={myListingsCount} sessionUser={session?.user ?? null} />
         {children}
         <SiteFooter isAdmin={isAdmin} />
         {process.env.NODE_ENV === 'production' && <Analytics />}

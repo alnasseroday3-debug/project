@@ -21,6 +21,7 @@ export default async function MyListingsPage() {
       askingPrice: carListings.askingPrice,
       status: carListings.status,
       images: carListings.images,
+      rejectionReason: carListings.rejectionReason,
     })
     .from(carListings)
     .where(eq(carListings.userId, session.user.id))

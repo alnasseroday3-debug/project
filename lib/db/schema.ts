@@ -79,6 +79,7 @@ export const carListings = pgTable('car_listings', {
   verificationImage: text('verification_image'),
   verified: boolean('verified').notNull().default(false),
   status: text('status').notNull().default('pending'),
+  rejectionReason: text('rejection_reason'),
   sellerName: text('sellerName'),
   sellerPhone: text('sellerPhone'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -93,4 +94,4 @@ export const rateLimits = pgTable('rate_limits', {
 
 export type CarListing = typeof carListings.$inferSelect
 export type PublicCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'mileage' | 'askingPrice' | 'city' | 'images' | 'verified'>
-export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'askingPrice' | 'status' | 'images'>
+export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'askingPrice' | 'status' | 'images' | 'rejectionReason'>
