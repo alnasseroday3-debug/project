@@ -7,7 +7,7 @@ import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
 import { consumeRateLimit, getClientAddress } from '@/lib/rate-limit'
 import { cookies, headers } from 'next/headers'
-import { isOwnedPublicBlobUrl, verificationUploadCookie } from '@/lib/blob-storage'
+import { deleteListingBlobs, isOwnedPublicBlobUrl, verificationUploadCookie } from '@/lib/blob-storage'
 
 type ListingDraft = {
   make: string
@@ -121,6 +121,60 @@ export async function submitListing(draft: ListingDraft) {
   } catch (error) {
     console.error('[v0] Failed to create car listing:', error)
     return { success: false, message: 'تعذّر حفظ الإعلان الآن. حاول مرة أخرى.' }
+  }
+}
+
+export async function removeOwnedListing(listingId: string) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { success: false, message: 'سجّل الدخول أولاً لإدارة إعلانك.' }
+  if (typeof listingId !== 'string' || !/^[0-9a-f-]{36}$/i.test(listingId)) {
+    return { success: false, message: 'معرّف الإعلان غير صالح.' }
+  }
+
+  try {
+    const [listing] = await db
+      .select({ status: carListings.status, images: carListings.images, verificationImage: carListings.verificationImage })
+      .from(carListings)
+      .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id)))
+      .limit(1)
+    if (!listing) return { success: false, message: 'الإعلان غير موجود أو لا تملك صلاحية إدارته.' }
+
+    if (listing.status === 'approved') {
+      const archived = await db
+        .update(carListings)
+        .set({ status: 'archived', updatedAt: new Date() })
+        .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'approved')))
+        .returning({ id: carListings.id })
+      if (!archived.length) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }
+      revalidatePath('/')
+      revalidatePath('/admin')
+      revalidatePath('/my-listings')
+      revalidatePath(`/cars/${listingId}`)
+      return { success: true, message: 'تمت إزالة الإعلان من العرض ونقله إلى أرشيف الإدارة.' }
+    }
+
+    if (listing.status !== 'pending' && listing.status !== 'rejected') {
+      return { success: false, message: 'لا يمكن حذف هذا الإعلان بهذه الطريقة.' }
+    }
+
+    const deleted = await db
+      .delete(carListings)
+      .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, listing.status)))
+      .returning({ id: carListings.id })
+    if (!deleted.length) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }
+
+    const blobsDeleted = await deleteListingBlobs(listing.images, listing.verificationImage, session.user.id)
+    revalidatePath('/')
+    revalidatePath('/admin')
+    revalidatePath('/my-listings')
+    revalidatePath(`/cars/${listingId}`)
+    return {
+      success: true,
+      message: blobsDeleted ? 'تم حذف الإعلان نهائياً.' : 'تم حذف الإعلان، لكن تعذّر حذف بعض الصور تلقائياً.',
+    }
+  } catch (error) {
+    console.error('[v0] Failed to remove owned listing:', error)
+    return { success: false, message: 'تعذّر حذف الإعلان الآن. حاول مرة أخرى.' }
   }
 }
 

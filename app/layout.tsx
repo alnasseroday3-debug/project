@@ -1,5 +1,5 @@
 import { Analytics } from '@vercel/analytics/next'
-import { count, eq } from 'drizzle-orm'
+import { and, count, eq, ne } from 'drizzle-orm'
 import type { Metadata, Viewport } from 'next'
 import { SiteFooter } from '@/components/marketplace/site-footer'
 import { SiteHeader } from '@/components/marketplace/site-header'
@@ -47,7 +47,7 @@ export default async function RootLayout({
     const [result] = await db
       .select({ total: count() })
       .from(carListings)
-      .where(eq(carListings.userId, session.user.id))
+      .where(and(eq(carListings.userId, session.user.id), ne(carListings.status, 'archived')))
     myListingsCount = result?.total ?? 0
   }
   if (isAdmin) {

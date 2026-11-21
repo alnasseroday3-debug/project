@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
+import { del } from '@vercel/blob'
 
 export const verificationUploadCookie = 'masar_verification_upload'
 
@@ -63,4 +64,20 @@ export function verificationImageContentType(url: string) {
   if (pathname.endsWith('.png.enc')) return 'image/png'
   if (pathname.endsWith('.webp.enc')) return 'image/webp'
   throw new Error('صيغة صورة التحقق غير معروفة.')
+}
+
+export async function deleteListingBlobs(images: string[], verificationImage: string | null, userId: string) {
+  const urls = [...new Set([
+    ...images.filter((url) => isOwnedPublicBlobUrl(url, 'cars', userId)),
+    ...(verificationImage && isOwnedPublicBlobUrl(verificationImage, 'verification', userId) ? [verificationImage] : []),
+  ])]
+  if (urls.length === 0) return true
+
+  try {
+    await del(urls)
+    return true
+  } catch (error) {
+    console.error('[v0] Failed to delete listing blobs:', error)
+    return false
+  }
 }
