@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { AtSign, CarFront } from 'lucide-react'
 
-export function SiteFooter() {
+export function SiteFooter({ isAdmin }: { isAdmin: boolean }) {
   return (
     <footer className="site-footer">
       <div className="footer-main">
@@ -16,7 +16,7 @@ export function SiteFooter() {
           <span className="footer-title">استكشف</span>
           <Link href="/">السيارات المعروضة</Link>
           <Link href="/sell">أضف إعلانك</Link>
-          <Link href="/admin">إدارة الإعلانات</Link>
+          {isAdmin && <Link href="/admin">إدارة الإعلانات</Link>}
         </div>
         <div className="footer-location">
           <span className="footer-title">منصتك الموثوقة</span>

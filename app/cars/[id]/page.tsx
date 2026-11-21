@@ -28,7 +28,31 @@ function InspectionCard({ icon, title, answer, details }: { icon: React.ReactNod
 
 export default async function CarPage({ params }: CarPageProps) {
   const { id } = await params
-  const [car] = await db.select().from(carListings).where(eq(carListings.id, id)).limit(1)
+  const [car] = await db.select({
+    id: carListings.id,
+    make: carListings.make,
+    model: carListings.model,
+    year: carListings.year,
+    condition: carListings.condition,
+    mileage: carListings.mileage,
+    usageMonths: carListings.usageMonths,
+    maintenanceVisited: carListings.maintenanceVisited,
+    maintenanceReason: carListings.maintenanceReason,
+    repaired: carListings.repaired,
+    repairDetails: carListings.repairDetails,
+    partsChanged: carListings.partsChanged,
+    changedParts: carListings.changedParts,
+    askingPrice: carListings.askingPrice,
+    negotiationMin: carListings.negotiationMin,
+    negotiationMax: carListings.negotiationMax,
+    city: carListings.city,
+    description: carListings.description,
+    images: carListings.images,
+    status: carListings.status,
+    sellerName: carListings.sellerName,
+    sellerPhone: carListings.sellerPhone,
+    verified: carListings.verified,
+  }).from(carListings).where(eq(carListings.id, id)).limit(1)
   if (!car || car.status !== 'approved') notFound()
 
   const images = car.images.map((image) => image.startsWith('http') || image.startsWith('/')
@@ -53,7 +77,7 @@ export default async function CarPage({ params }: CarPageProps) {
             <span className="condition-badge detail-condition">{car.condition === 'new' ? 'جديدة' : 'مستعملة'}</span>
           </div>
           <div className="detail-title-block">
-            <div><span className="listing-make">{car.make}</span><h1>{car.model}</h1></div>
+            <div><span className="listing-make">{car.make}</span><h1>{car.model}</h1>{car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار ✓</span>}</div>
             <span className="detail-year">{car.year}</span>
           </div>
           <div className="detail-specs">
@@ -84,7 +108,7 @@ export default async function CarPage({ params }: CarPageProps) {
             {phone && <a className="phone-button" href={`tel:${phone}`}><Phone aria-hidden="true" /> اتصال هاتفي</a>}
             <p className="secure-note"><BadgeCheck aria-hidden="true" /> الإعلان تمت مراجعته من فريق مَسَار</p>
           </div>
-          <div className="seller-card"><span className="seller-avatar">{car.sellerName?.slice(0, 1) || 'م'}</span><div><span>المعلن</span><strong>{car.sellerName || 'معلن مَسَار'}</strong></div><BadgeCheck aria-label="إعلان موثّق" /></div>
+          <div className="seller-card"><span className="seller-avatar">{car.sellerName?.slice(0, 1) || 'م'}</span><div><span>المعلن</span><strong>{car.sellerName || 'معلن مَسَار'}</strong>{car.verified && <span className="seller-verified">موثق من مَسَار ✓</span>}</div>{car.verified && <BadgeCheck aria-label="إعلان موثق من مَسَار" />}</div>
           <Link className="back-link" href="/">العودة إلى السيارات <ArrowRight aria-hidden="true" /></Link>
         </aside>
       </div>

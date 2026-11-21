@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft, BadgeCheck, Clock3, FileText, XCircle } from 'lucide-react'
 import { CarPhoto } from '@/components/marketplace/car-photo'
 import { carImageUrl } from '@/lib/car-image-url'
-import type { CarListing } from '@/lib/db/schema'
+import type { OwnerCarListing } from '@/lib/db/schema'
 
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
@@ -14,7 +14,7 @@ const listingStatus = {
   rejected: { label: 'مرفوض', className: 'my-listing-status is-rejected', icon: XCircle },
 } as const
 
-export function MyListings({ listings }: { listings: CarListing[] }) {
+export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
   return (
     <main className="my-listings-page page-container">
       <div className="my-listings-heading">

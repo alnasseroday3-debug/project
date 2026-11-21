@@ -7,7 +7,18 @@ export const dynamic = 'force-dynamic'
 
 export default async function Page() {
   const cars = await db
-    .select()
+    .select({
+      id: carListings.id,
+      make: carListings.make,
+      model: carListings.model,
+      year: carListings.year,
+      condition: carListings.condition,
+      mileage: carListings.mileage,
+      askingPrice: carListings.askingPrice,
+      city: carListings.city,
+      images: carListings.images,
+      verified: carListings.verified,
+    })
     .from(carListings)
     .where(eq(carListings.status, 'approved'))
     .orderBy(desc(carListings.createdAt))

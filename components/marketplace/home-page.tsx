@@ -4,13 +4,13 @@ import Image from 'next/image'
 import { CarPhoto } from '@/components/marketplace/car-photo'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowUpLeft, Check, ChevronDown, CircleHelp, Gauge, MapPin, Search, ShieldCheck, SlidersHorizontal, Sparkles, Tag } from 'lucide-react'
-import type { CarListing } from '@/lib/db/schema'
+import { ArrowLeft, ArrowUpLeft, BadgeCheck, Check, ChevronDown, CircleHelp, Gauge, MapPin, Search, ShieldCheck, SlidersHorizontal, Sparkles, Tag } from 'lucide-react'
+import type { PublicCarListing } from '@/lib/db/schema'
 import { carImageUrl } from '@/lib/car-image-url'
 
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
-function ListingCard({ car }: { car: CarListing }) {
+function ListingCard({ car }: { car: PublicCarListing }) {
   return (
     <article className="listing-card">
       <Link className="listing-image-link" href={`/cars/${car.id}`} aria-label={`عرض ${car.make} ${car.model}`}>
@@ -26,6 +26,7 @@ function ListingCard({ car }: { car: CarListing }) {
           </div>
           <span className="listing-year">{car.year}</span>
         </div>
+        {car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار ✓</span>}
         <div className="listing-meta">
           <span><Gauge aria-hidden="true" />{money.format(car.mileage)} كم</span>
           <span><MapPin aria-hidden="true" />{car.city || 'سوريا'}</span>
@@ -39,7 +40,7 @@ function ListingCard({ car }: { car: CarListing }) {
   )
 }
 
-export function HomePage({ cars }: { cars: CarListing[] }) {
+export function HomePage({ cars }: { cars: PublicCarListing[] }) {
   const [query, setQuery] = useState('')
   const [condition, setCondition] = useState<'all' | 'new' | 'used'>('all')
   const [minPrice, setMinPrice] = useState('')

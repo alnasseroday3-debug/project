@@ -1,7 +1,11 @@
 import { Analytics } from '@vercel/analytics/next'
+import { count, eq } from 'drizzle-orm'
 import type { Metadata, Viewport } from 'next'
 import { SiteFooter } from '@/components/marketplace/site-footer'
 import { SiteHeader } from '@/components/marketplace/site-header'
+import { getCurrentSession, isAdminEmail } from '@/lib/auth-helpers'
+import { db } from '@/lib/db'
+import { carListings } from '@/lib/db/schema'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -28,17 +32,30 @@ export const viewport: Viewport = {
   themeColor: '#e5e7eb',
 }
 
-export default function RootLayout({
+export const dynamic = 'force-dynamic'
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const session = await getCurrentSession()
+  const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified))
+  let pendingCount = 0
+  if (isAdmin) {
+    const [result] = await db
+      .select({ total: count() })
+      .from(carListings)
+      .where(eq(carListings.status, 'pending'))
+    pendingCount = result?.total ?? 0
+  }
+
   return (
     <html lang="ar" dir="rtl">
       <body className="antialiased">
-        <SiteHeader />
+        <SiteHeader isAdmin={isAdmin} pendingCount={pendingCount} />
         {children}
-        <SiteFooter />
+        <SiteFooter isAdmin={isAdmin} />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

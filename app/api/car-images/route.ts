@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     const session = await auth.api.getSession({ headers: request.headers })
     const isOwner = session?.user.id === listing.userId
     const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified))
+    if (!session?.user) return NextResponse.json({ error: 'غير مصرح.' }, { status: 403 })
     if (!isOwner && !isAdmin) return NextResponse.json({ error: 'غير مصرح.' }, { status: 403 })
   }
 

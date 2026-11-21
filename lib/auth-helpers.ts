@@ -6,9 +6,9 @@ export async function getCurrentSession() {
 }
 
 export function isAdminEmail(email: string, emailVerified: boolean) {
-  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase()
+  const adminEmail = process.env.ADMIN_EMAIL
   const productionVerification = process.env.NODE_ENV !== 'production' || emailVerified
-  return Boolean(adminEmail && email.toLowerCase() === adminEmail && productionVerification)
+  return Boolean(adminEmail && email === adminEmail && productionVerification)
 }
 
 export async function isAdminSession() {

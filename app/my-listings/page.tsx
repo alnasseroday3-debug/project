@@ -12,7 +12,16 @@ export default async function MyListingsPage() {
   if (!session?.user) redirect('/sign-in?next=%2Fmy-listings')
 
   const listings = await db
-    .select()
+    .select({
+      id: carListings.id,
+      make: carListings.make,
+      model: carListings.model,
+      year: carListings.year,
+      condition: carListings.condition,
+      askingPrice: carListings.askingPrice,
+      status: carListings.status,
+      images: carListings.images,
+    })
     .from(carListings)
     .where(eq(carListings.userId, session.user.id))
     .orderBy(desc(carListings.createdAt))

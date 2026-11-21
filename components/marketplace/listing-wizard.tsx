@@ -39,11 +39,16 @@ export function ListingWizard({ userName }: { userName: string }) {
   const [sellerPhone, setSellerPhone] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
+  const [verificationFile, setVerificationFile] = useState<File | null>(null)
+  const [verificationPreview, setVerificationPreview] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [complete, setComplete] = useState(false)
 
   useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews])
+  useEffect(() => () => {
+    if (verificationPreview) URL.revokeObjectURL(verificationPreview)
+  }, [verificationPreview])
 
   function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files || [])
@@ -52,8 +57,8 @@ export function ListingWizard({ userName }: { userName: string }) {
       event.target.value = ''
       return
     }
-    if (selected.some((file) => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 4 * 1024 * 1024)) {
-      setError('اختر صور JPG أو PNG أو WebP، بحجم أقل من 4 ميغابايت للصورة.')
+    if (selected.some((file) => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+      setError('اختر صور JPG أو PNG أو WebP، بحجم لا يتجاوز 5 ميغابايت للصورة.')
       event.target.value = ''
       return
     }
@@ -65,6 +70,19 @@ export function ListingWizard({ userName }: { userName: string }) {
   function removeImage(index: number) {
     setFiles((current) => current.filter((_, currentIndex) => currentIndex !== index))
     setPreviews((current) => current.filter((_, currentIndex) => currentIndex !== index))
+  }
+
+  function handleVerificationFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size === 0 || file.size > 5 * 1024 * 1024) {
+      setError('صورة التحقق يجب أن تكون JPG أو PNG أو WebP وبحد أقصى 5 ميغابايت.')
+      event.target.value = ''
+      return
+    }
+    setError('')
+    setVerificationFile(file)
+    setVerificationPreview(URL.createObjectURL(file))
   }
 
   function goNext() {
@@ -80,8 +98,9 @@ export function ListingWizard({ userName }: { userName: string }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy || files.length === 0) {
-      if (!files.length) setError('أضف صورة واحدة على الأقل للمتابعة.')
+    if (busy || files.length === 0 || !verificationFile) {
+      if (!files.length) setError('أضف صورة واحدة على الأقل للسيارة.')
+      else if (!verificationFile) setError('أضف صورة التحقق وإثبات الجدية للمتابعة.')
       return
     }
     setBusy(true)
@@ -92,11 +111,19 @@ export function ListingWizard({ userName }: { userName: string }) {
       for (const file of files) {
         const uploadForm = new FormData()
         uploadForm.append('file', file)
+        uploadForm.append('kind', 'car')
         const response = await fetch('/api/uploads', { method: 'POST', body: uploadForm })
         const result = await response.json()
         if (!response.ok) throw new Error(result.error || 'تعذّر رفع الصور.')
         imagePaths.push(result.pathname)
       }
+
+      const verificationForm = new FormData()
+      verificationForm.append('file', verificationFile)
+      verificationForm.append('kind', 'verification')
+      const verificationResponse = await fetch('/api/uploads', { method: 'POST', body: verificationForm })
+      const verificationResult = await verificationResponse.json()
+      if (!verificationResponse.ok) throw new Error(verificationResult.error || 'تعذّر رفع صورة التحقق.')
 
       const result = await submitListing({
         make,
@@ -118,6 +145,7 @@ export function ListingWizard({ userName }: { userName: string }) {
         description,
         sellerPhone,
         images: imagePaths,
+        verificationImage: verificationResult.pathname,
       })
       if (!result.success) throw new Error(result.message)
       setComplete(true)
@@ -202,22 +230,31 @@ export function ListingWizard({ userName }: { userName: string }) {
           </div>
 
           <div id="listing-step-3" hidden={step !== 3}>
-            <div className="form-section-heading"><span className="eyebrow eyebrow-green">أخيراً، الصورة تكملها</span><h2>خلّها تنشاف.</h2><p>ارفع حتى 6 صور واضحة للسيارة. الصور بصيغة JPG أو PNG أو WebP.</p></div>
+            <div className="form-section-heading"><span className="eyebrow eyebrow-green">أخيراً، الصورة تكملها</span><h2>خلّها تنشاف.</h2><p>ارفع حتى 6 صور واضحة للسيارة، ثم صورة خاصة لفريق المراجعة.</p></div>
             <label className="upload-dropzone">
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} aria-label="اختر صور السيارة" />
               <span className="upload-icon"><ImagePlus aria-hidden="true" /></span>
               <strong>اسحب الصور هنا أو اخترها من جهازك</strong>
-              <small>حتى 6 صور · 4 ميغابايت للصورة كحد أقصى</small>
+              <small>حتى 6 صور · 5 ميغابايت للصورة كحد أقصى</small>
               <span className="upload-button"><Camera aria-hidden="true" /> اختيار الصور</span>
             </label>
             {previews.length > 0 && <div className="image-preview-grid">{previews.map((preview, index) => <div className="image-preview" key={preview}><Image src={preview} alt={`معاينة صورة السيارة ${index + 1}`} width={240} height={180} unoptimized /><button type="button" aria-label={`حذف الصورة ${index + 1}`} onClick={() => removeImage(index)}><X aria-hidden="true" /></button></div>)}</div>}
-            <div className="upload-privacy"><ShieldCheck aria-hidden="true" /><span>صورك محفوظة بشكل خاص، وتظهر للمشترين فقط بعد الموافقة على الإعلان.</span></div>
+            <div className="upload-privacy"><ShieldCheck aria-hidden="true" /><span>صور السيارة فقط ستظهر للمشترين بعد الموافقة على الإعلان.</span></div>
+            <label className="upload-dropzone verification-upload">
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleVerificationFile} aria-label="صورة التحقق وإثبات الجدية" required />
+              <span className="upload-icon"><ShieldCheck aria-hidden="true" /></span>
+              <strong>صورة التحقق وإثبات الجدية <span aria-hidden="true">(مطلوبة)</span></strong>
+              <small>صوّر السيارة مع ورقة مكتوب عليها «مسار» وتاريخ اليوم، أو صورة لميكانيك السيارة مع إخفاء المعلومات الشخصية.</small>
+              <span className="upload-button"><Camera aria-hidden="true" /> {verificationFile ? 'تغيير صورة التحقق' : 'اختيار صورة التحقق'}</span>
+            </label>
+            {verificationPreview && <div className="verification-preview"><Image src={verificationPreview} alt="معاينة صورة التحقق التي ستظهر للإدارة فقط" width={480} height={320} unoptimized /><span>صورة خاصة بالإدارة فقط</span></div>}
+            <div className="upload-privacy verification-privacy"><ShieldCheck aria-hidden="true" /><span>هذه الصورة لا تُنشر للعامة، ولا يطّلع عليها إلا فريق إدارة مَسَار للمراجعة.</span></div>
           </div>
 
           {error && <p className="form-alert wizard-alert" role="alert">{error}</p>}
           <div className="wizard-actions">
             {step > 0 ? <button className="wizard-back" type="button" onClick={() => { setError(''); setStep((current) => current - 1) }}><ArrowRight aria-hidden="true" /> رجوع</button> : <span />}
-            {step < steps.length - 1 ? <button className="primary-button wizard-next" type="button" onClick={goNext}>الخطوة التالية <ArrowLeft aria-hidden="true" /></button> : <button className="primary-button wizard-next" type="submit" disabled={busy || !files.length}>{busy ? 'جارٍ رفع الصور…' : 'إرسال للمراجعة'} {busy ? <span className="button-spinner" /> : <ArrowLeft aria-hidden="true" />}</button>}
+            {step < steps.length - 1 ? <button className="primary-button wizard-next" type="button" onClick={goNext}>الخطوة التالية <ArrowLeft aria-hidden="true" /></button> : <button className="primary-button wizard-next" type="submit" disabled={busy || !files.length || !verificationFile}>{busy ? 'جارٍ رفع الصور…' : 'إرسال للمراجعة'} {busy ? <span className="button-spinner" /> : <ArrowLeft aria-hidden="true" />}</button>}
           </div>
         </form>
       </div>
