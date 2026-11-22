@@ -1,4 +1,4 @@
-import { and, desc, eq, gt } from 'drizzle-orm'
+import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import type { Metadata } from 'next'
 import { HomePage } from '@/components/marketplace/home-page'
 import { db } from '@/lib/db'
@@ -36,7 +36,7 @@ export default async function Page() {
     })
     .from(carListings)
     .where(and(eq(carListings.status, 'approved'), gt(carListings.expiresAt, new Date())))
-    .orderBy(desc(carListings.publishedAt))
+    .orderBy(sql`${carListings.publishedAt} DESC NULLS LAST`, desc(carListings.createdAt))
     .limit(13)
 
   const hasMore = listings.length > 12

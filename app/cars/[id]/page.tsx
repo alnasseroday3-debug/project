@@ -20,24 +20,31 @@ function selectedDetail(details: ListingDetails, field: string, otherField: stri
 }
 
 function categorySpecs(category: ListingCategory, details: ListingDetails) {
-  const condition = details.condition || details.propertyCondition || ''
+  const condition = details.condition || selectedDetail(details, 'propertyCondition', 'propertyConditionOther')
   const itemType = category === 'real_estate' ? selectedDetail(details, 'propertyType', 'propertyTypeOther') : selectedDetail(details, 'itemType', 'itemTypeOther')
+  const brand = selectedDetail(details, 'brand', 'brandOther')
   const specs = category === 'real_estate'
     ? [
         { icon: <House aria-hidden="true" />, label: 'نوع العقار', value: itemType },
         { icon: <Ruler aria-hidden="true" />, label: 'المساحة', value: details.areaSqm ? `${details.areaSqm} م²` : '' },
         { icon: <Tag aria-hidden="true" />, label: 'عدد الغرف', value: details.rooms },
-        { icon: <House aria-hidden="true" />, label: 'الطابق', value: details.floor },
-        { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition },
+        { icon: <House aria-hidden="true" />, label: 'الطابق', value: selectedDetail(details, 'floor', 'floorOther') },
+        { icon: <BadgeCheck aria-hidden="true" />, label: 'الإكساء', value: selectedDetail(details, 'propertyCondition', 'propertyConditionOther') },
         { icon: <ShieldCheck aria-hidden="true" />, label: 'نوع الملكية', value: selectedDetail(details, 'ownershipType', 'ownershipOther') },
       ]
     : category === 'furniture'
-      ? [{ icon: <House aria-hidden="true" />, label: 'نوع الأثاث', value: itemType }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }]
+      ? [{ icon: <House aria-hidden="true" />, label: 'نوع الأثاث', value: itemType }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }, { icon: <Tag aria-hidden="true" />, label: 'القطع أو الخشب', value: details.piecesOrWood }]
       : category === 'appliances'
-        ? [{ icon: <Tag aria-hidden="true" />, label: 'نوع الأداة', value: itemType }, { icon: <Tag aria-hidden="true" />, label: 'الماركة', value: details.brand }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }]
+        ? [{ icon: <Tag aria-hidden="true" />, label: 'نوع الأداة', value: itemType }, { icon: <Tag aria-hidden="true" />, label: 'الماركة', value: brand }, { icon: <Ruler aria-hidden="true" />, label: 'السعة أو الاستطاعة', value: details.capacity }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }]
         : category === 'electronics'
-          ? [{ icon: <Smartphone aria-hidden="true" />, label: 'نوع الجهاز', value: itemType }, { icon: <Tag aria-hidden="true" />, label: 'السعة والمواصفات', value: details.specifications }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }]
-          : [{ icon: <Store aria-hidden="true" />, label: 'النوع', value: itemType }, { icon: <Store aria-hidden="true" />, label: 'صفة البائع', value: details.sellerType }, { icon: <Tag aria-hidden="true" />, label: 'المقاسات', value: details.size }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }]
+          ? details.itemType === 'موبايل'
+            ? [{ icon: <Smartphone aria-hidden="true" />, label: 'الجهاز', value: 'موبايل' }, { icon: <Tag aria-hidden="true" />, label: 'الماركة', value: brand }, { icon: <Tag aria-hidden="true" />, label: 'الموديل', value: details.deviceModel }, { icon: <Tag aria-hidden="true" />, label: 'السعة التخزينية', value: selectedDetail(details, 'storage', 'storageOther') }, { icon: <Tag aria-hidden="true" />, label: 'الرام', value: selectedDetail(details, 'ram', 'ramOther') }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }, { icon: <ShieldCheck aria-hidden="true" />, label: 'الجمركة', value: details.customsStatus }, { icon: <Tag aria-hidden="true" />, label: 'الملحقات', value: details.accessories }]
+            : ['لابتوب', 'كمبيوتر مكتبي', 'كمبيوتر'].includes(details.itemType ?? '')
+              ? [{ icon: <Smartphone aria-hidden="true" />, label: 'النوع', value: itemType }, { icon: <Tag aria-hidden="true" />, label: 'الماركة', value: brand }, { icon: <Tag aria-hidden="true" />, label: 'المعالج', value: selectedDetail(details, 'processor', 'processorOther') }, { icon: <Tag aria-hidden="true" />, label: 'الرام', value: selectedDetail(details, 'ram', 'ramOther') }, { icon: <Tag aria-hidden="true" />, label: 'التخزين', value: selectedDetail(details, 'storage', 'storageOther') }, { icon: <Tag aria-hidden="true" />, label: 'كرت الشاشة', value: details.graphicsModel ? `${details.graphicsType} · ${details.graphicsModel}` : details.graphicsType }, { icon: <Wrench aria-hidden="true" />, label: 'تبديل قطع أو صيانة', value: details.partsChanged === 'yes' ? 'نعم، تم التبديل' : details.partsChanged === 'no' ? 'لا، وكالة' : '' }, { icon: <CalendarDays aria-hidden="true" />, label: 'مدة الاستعمال', value: details.usageMonths ? `${details.usageMonths} شهر` : '0 شهر' }]
+              : details.itemType === 'بلايستيشن وألعاب'
+                ? [{ icon: <Smartphone aria-hidden="true" />, label: 'النوع', value: itemType }, { icon: <Tag aria-hidden="true" />, label: 'الجهاز', value: selectedDetail(details, 'gameConsole', 'gameConsoleOther') }, { icon: <Tag aria-hidden="true" />, label: 'نسخة الجهاز', value: details.gameMedia }, { icon: <Tag aria-hidden="true" />, label: 'عدد القبضات', value: details.controllerCount }, { icon: <BadgeCheck aria-hidden="true" />, label: 'حالة النظام', value: details.gameStatus }]
+                : [{ icon: <Smartphone aria-hidden="true" />, label: 'النوع', value: itemType }, { icon: <Tag aria-hidden="true" />, label: 'الماركة', value: brand }, { icon: <Tag aria-hidden="true" />, label: 'المواصفات', value: details.specifications }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }]
+          : [{ icon: <Store aria-hidden="true" />, label: 'النوع', value: itemType }, { icon: <Store aria-hidden="true" />, label: 'صفة البائع', value: details.sellerType }, { icon: <Store aria-hidden="true" />, label: 'اسم المحل', value: details.shopName }, { icon: <Tag aria-hidden="true" />, label: 'المقاسات', value: details.size }, { icon: <BadgeCheck aria-hidden="true" />, label: 'الحالة', value: condition }]
   return [...specs, ...(details.district ? [{ icon: <MapPin aria-hidden="true" />, label: 'المنطقة', value: details.district }] : [])].filter((spec) => spec.value)
 }
 
@@ -98,7 +105,7 @@ export default async function CarPage({ params }: CarPageProps) {
   const details = car.details ?? {}
   const isCar = category === 'cars'
   const specs = categorySpecs(category, details)
-  const itemTitle = [car.make, car.model].filter(Boolean).join(' ')
+  const itemTitle = isCar ? [car.make, car.model].filter(Boolean).join(' ') : car.make || car.model
   const images = car.images.map((image) => image.startsWith('http') || image.startsWith('/')
     ? image
     : `/api/car-images?listing=${encodeURIComponent(car.id)}&path=${encodeURIComponent(image)}`)
@@ -125,7 +132,7 @@ export default async function CarPage({ params }: CarPageProps) {
             {(isCar ? (car.condition === 'new' ? 'جديدة' : 'مستعملة') : details.condition) && <span className="condition-badge detail-condition">{isCar ? (car.condition === 'new' ? 'جديدة' : 'مستعملة') : details.condition}</span>}
           </div>
           <div className="detail-title-block">
-            <div><span className="listing-make">{isCar ? car.make : listingCategoryLabels[category]}</span><h1>{isCar ? car.model : car.make}</h1>{!isCar && car.model && <p className="detail-subtitle">{car.model}</p>}{car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار</span>}</div>
+            <div><span className="listing-make">{isCar ? car.make : listingCategoryLabels[category]}</span><h1>{isCar ? car.model : car.make}</h1>{car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار</span>}</div>
             {isCar && <span className="detail-year">{car.year}</span>}
           </div>
           <div className="detail-specs">

@@ -43,7 +43,7 @@ export function SiteHeader({ isAdmin, pendingCount, myListingsCount, sessionUser
         </button>
 
         <nav className={`site-nav${menuOpen ? ' is-open' : ''}`} aria-label="التنقل الرئيسي">
-          <Link className={pathname === '/' ? 'nav-link is-active' : 'nav-link'} href="/" onClick={closeMenu}>اكتشف السيارات</Link>
+          <Link className={pathname === '/' ? 'nav-link is-active' : 'nav-link'} href="/" onClick={closeMenu}>تصفح السوق</Link>
           <Link className={pathname === '/sell' ? 'nav-link is-active' : 'nav-link'} href="/sell" onClick={closeMenu}>أضف إعلانك</Link>
           {sessionUser && <Link className={pathname.startsWith('/my-listings') ? 'nav-link is-active nav-listings-link' : 'nav-link nav-listings-link'} href="/my-listings" aria-label={`إعلاناتي، ${myListingsCount} إعلانات`} onClick={closeMenu}><span>إعلاناتي</span><span className="nav-listings-badge" aria-hidden="true">{myListingsCount > 99 ? '99+' : myListingsCount}</span></Link>}
           {isAdmin && <Link className={pathname === '/admin' ? 'nav-link is-active nav-admin-link' : 'nav-link nav-admin-link'} href="/admin" onClick={closeMenu}>إدارة الإعلانات{pendingCount > 0 && <span className="nav-admin-badge" aria-label={`${pendingCount} طلبات بانتظار المراجعة`}>{pendingCount > 99 ? '99+' : pendingCount}</span>}</Link>}

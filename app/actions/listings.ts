@@ -1,6 +1,6 @@
 'use server'
 
-import { and, eq, gte, lt, lte, or, sql } from 'drizzle-orm'
+import { and, eq, gte, lt, lte, ne, or, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -63,11 +63,11 @@ const isVehicleDetailsValid = (draft: ListingDraft) =>
 
 const categoryDetailKeys: Record<ListingCategory, string[]> = {
   cars: ['district'],
-  real_estate: ['district', 'propertyType', 'propertyTypeOther', 'areaSqm', 'rooms', 'floor', 'propertyCondition', 'ownershipType', 'ownershipOther', 'condition'],
-  furniture: ['district', 'itemType', 'itemTypeOther', 'condition'],
-  appliances: ['district', 'itemType', 'itemTypeOther', 'brand', 'condition'],
-  electronics: ['district', 'itemType', 'itemTypeOther', 'specifications', 'condition'],
-  fashion: ['district', 'itemType', 'itemTypeOther', 'sellerType', 'size', 'condition'],
+  real_estate: ['district', 'propertyType', 'propertyTypeOther', 'areaSqm', 'rooms', 'floor', 'floorOther', 'propertyCondition', 'propertyConditionOther', 'ownershipType', 'ownershipOther', 'condition'],
+  furniture: ['district', 'itemType', 'itemTypeOther', 'condition', 'piecesOrWood'],
+  appliances: ['district', 'itemType', 'itemTypeOther', 'brand', 'brandOther', 'capacity', 'condition'],
+  electronics: ['district', 'itemType', 'itemTypeOther', 'brand', 'brandOther', 'deviceModel', 'storage', 'storageOther', 'ram', 'ramOther', 'condition', 'customsStatus', 'accessories', 'processor', 'processorOther', 'graphicsType', 'graphicsModel', 'partsChanged', 'usageMonths', 'gameConsole', 'gameConsoleOther', 'gameMedia', 'controllerCount', 'gameStatus', 'specifications'],
+  fashion: ['district', 'itemType', 'itemTypeOther', 'sellerType', 'shopName', 'size', 'condition'],
 }
 
 function sanitizeDetails(category: ListingCategory, input: unknown): ListingDetails {
@@ -75,7 +75,7 @@ function sanitizeDetails(category: ListingCategory, input: unknown): ListingDeta
   const source = input as Record<string, unknown>
   const details: ListingDetails = {}
   for (const key of categoryDetailKeys[category]) {
-    const maximum = key === 'specifications' ? 150 : key === 'district' ? 60 : 120
+    const maximum = key === 'specifications' ? 150 : key === 'district' ? 60 : key === 'deviceModel' || key === 'graphicsModel' ? 80 : 120
     const value = cleanText(source[key], maximum)
     if (value) details[key] = value
   }
@@ -92,21 +92,51 @@ function areCategoryDetailsValid(category: ListingCategory, details: ListingDeta
   if (category === 'real_estate') {
     return hasSelectedOption(details, 'propertyType', ['شقة', 'بيت عربي', 'مزرعة', 'محل تجاري', 'أرض'], 'propertyTypeOther') &&
       /^\d{1,6}$/.test(details.areaSqm ?? '') && Number(details.areaSqm) > 0 &&
-      /^\d{1,3}$/.test(details.rooms ?? '') && Boolean(details.floor?.trim()) &&
-      ['سوبر ديلوكس', 'على العضم', 'مفروش', 'عادي'].includes(details.propertyCondition ?? '') &&
+      /^\d{1,3}$/.test(details.rooms ?? '') && hasSelectedOption(details, 'floor', ['قبو', 'أرضي', 'أول', 'ثاني', 'ثالث', 'رابع', 'خامس', 'أخير'], 'floorOther') &&
+      hasSelectedOption(details, 'propertyCondition', ['سوبر ديلوكس', 'على العضم', 'مفروش', 'عادي'], 'propertyConditionOther') &&
       hasSelectedOption(details, 'ownershipType', ['طابو أخضر', 'حكم محكمة', 'كاتب عدل'], 'ownershipOther')
   }
   const typeOptions: Record<Exclude<ListingCategory, 'cars' | 'real_estate'>, string[]> = {
-    furniture: ['غرفة نوم', 'طقم كنب', 'سفرة', 'مطبخ', 'سجاد وموكيت', 'مكاتب'],
-    appliances: ['براد', 'غسالة', 'مكيف', 'شاشة', 'غاز/فرن', 'منظومة طاقة شمسية/بطاريات/إنفرتر'],
-    electronics: ['موبايل', 'لابتوب', 'كمبيوتر', 'تابلت', 'بلايستيشن وألعاب', 'كاميرات وإكسسوارات'],
+    furniture: ['غرفة نوم', 'طقم كنب', 'غرفة سفرة', 'سفرة', 'مطبخ', 'سجاد وموكيت', 'طاولات ومكاتب', 'مكاتب'],
+    appliances: ['براد', 'غسالة', 'مكيف', 'شاشة', 'غاز/فرن', 'منظومة طاقة شمسية/ألواح/بطاريات/إنفرتر', 'منظومة طاقة شمسية/بطاريات/إنفرتر'],
+    electronics: ['موبايل', 'لابتوب', 'كمبيوتر مكتبي', 'كمبيوتر', 'بلايستيشن وألعاب', 'تابلت', 'كاميرات', 'كاميرات وإكسسوارات', 'إكسسوارات', 'أخرى'],
     fashion: ['رجالي', 'نسائي', 'أطفال', 'أحذية وحقائب', 'بالة أوروبية'],
   }
   if (!hasSelectedOption(details, 'itemType', typeOptions[category], 'itemTypeOther')) return false
-  if (category === 'furniture') return ['جديد', 'مستعمل نظيف', 'مستعمل'].includes(details.condition ?? '')
-  if (category === 'appliances') return Boolean(details.brand?.trim()) && ['جديد', 'مستعمل'].includes(details.condition ?? '')
-  if (category === 'electronics') return Boolean(details.specifications?.trim()) && ['جديد', 'مستعمل نظيف'].includes(details.condition ?? '')
+  if (category === 'furniture') return ['جديد', 'مستعمل نظيف', 'مستعمل'].includes(details.condition ?? '') && Boolean(details.piecesOrWood?.trim())
+  if (category === 'appliances') return hasSelectedOption(details, 'brand', ['سامسونج', 'LG', 'بوش', 'بيكو', 'أريستون', 'هاير', 'هايسنس', 'ميديا', 'جري', 'دايكن'], 'brandOther') && Boolean(details.capacity?.trim()) && ['جديد', 'مستعمل'].includes(details.condition ?? '')
+  if (category === 'electronics') {
+    const phoneBrands = ['آيفون / أبل', 'سامسونج', 'شاومي / ريدمي', 'هواوي', 'أوبو', 'ريلمي', 'إنفينيكس', 'تكنو']
+    const computerBrands = ['ديل', 'HP', 'لينوفو', 'أسوس', 'أبل ماك', 'MSI', 'تجميعة مكتبية']
+    if (details.itemType === 'موبايل') {
+      return hasSelectedOption(details, 'brand', phoneBrands, 'brandOther') && Boolean(details.deviceModel?.trim()) &&
+        hasSelectedOption(details, 'storage', ['64GB', '128GB', '256GB', '512GB', '1TB'], 'storageOther') &&
+        hasSelectedOption(details, 'ram', ['4GB', '6GB', '8GB', '12GB', '16GB'], 'ramOther') &&
+        ['جديد زيرو', 'مستعمل نظيف كالوكالة', 'مستعمل'].includes(details.condition ?? '') &&
+        ['مجمرك نظامي', 'غير مجمرك'].includes(details.customsStatus ?? '') &&
+        ['مع العلبة والشاحن', 'جهاز فقط'].includes(details.accessories ?? '')
+    }
+    if (['لابتوب', 'كمبيوتر مكتبي', 'كمبيوتر'].includes(details.itemType ?? '')) {
+      return hasSelectedOption(details, 'brand', computerBrands, 'brandOther') &&
+        hasSelectedOption(details, 'processor', ['Core i3', 'Core i5', 'Core i7', 'Core i9', 'Ryzen 5', 'Ryzen 7', 'Apple M1-M3'], 'processorOther') &&
+        hasSelectedOption(details, 'ram', ['8GB', '16GB', '32GB', '64GB'], 'ramOther') &&
+        hasSelectedOption(details, 'storage', ['256GB SSD', '512GB SSD', '1TB SSD', 'HDD+SSD'], 'storageOther') &&
+        ['مدمج', 'منفصل NVIDIA/AMD'].includes(details.graphicsType ?? '') &&
+        (details.graphicsType !== 'منفصل NVIDIA/AMD' || Boolean(details.graphicsModel?.trim())) &&
+        ['yes', 'no'].includes(details.partsChanged ?? '') && /^\d{1,4}$/.test(details.usageMonths ?? '') && Number(details.usageMonths) <= 1200
+    }
+    if (details.itemType === 'بلايستيشن وألعاب') {
+      return hasSelectedOption(details, 'gameConsole', ['PS5', 'PS4 Pro', 'PS4 Slim', 'Xbox Series X/S', 'نينتندو سويتش'], 'gameConsoleOther') &&
+        ['نسخة أقراص CD', 'ديجيتال'].includes(details.gameMedia ?? '') &&
+        ['1', '2', '3', '4', 'أكثر من 4'].includes(details.controllerCount ?? '') &&
+        ['أونلاين نظامي', 'مهكّر مع ألعاب'].includes(details.gameStatus ?? '')
+    }
+    return hasSelectedOption(details, 'brand', [...phoneBrands, ...computerBrands, 'Canon', 'Sony', 'نيكون'], 'brandOther') &&
+      Boolean(details.specifications?.trim()) &&
+      ['جديد زيرو', 'مستعمل نظيف كالوكالة', 'مستعمل'].includes(details.condition ?? '')
+  }
   return ['فرد', 'محل تجاري', 'مول'].includes(details.sellerType ?? '') &&
+    (details.sellerType === 'فرد' || Boolean(details.shopName?.trim())) &&
     ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'مقاس موحد', 'تشكيلة مقاسات متنوعة'].includes(details.size ?? '') &&
     ['جديد', 'بالة فرز أول', 'مستعمل'].includes(details.condition ?? '')
 }
@@ -118,13 +148,6 @@ export async function submitListing(draft: ListingDraft) {
   const verificationImage = cookieStore.get(verificationUploadCookie)?.value
 
   try {
-    const requestHeaders = await headers()
-    const limits = await Promise.all([
-      consumeRateLimit('listing-user', session.user.id, 3, 15 * 60_000),
-      consumeRateLimit('listing-ip', getClientAddress(requestHeaders), 10, 60 * 60_000),
-    ])
-    if (limits.some((allowed) => !allowed)) return { success: false, message: 'تجاوزت حد إرسال الإعلانات. حاول لاحقاً.' }
-
     const category = draft.category === undefined ? 'cars' : draft.category
     if (!isListingCategory(category)) return { success: false, message: 'اختر قسماً صحيحاً للإعلان.' }
     const details = sanitizeDetails(category, draft.details)
@@ -160,6 +183,32 @@ export async function submitListing(draft: ListingDraft) {
     if (!verificationImage || !isOwnedPublicBlobUrl(verificationImage, 'verification', session.user.id)) {
       return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
     }
+
+    const requestHeaders = await headers()
+    const limits = await Promise.all([
+      consumeRateLimit('listing-user', session.user.id, 3, 60 * 60_000),
+      consumeRateLimit('listing-ip', getClientAddress(requestHeaders), 10, 60 * 60_000),
+    ])
+    if (limits.some((allowed) => !allowed)) return { success: false, message: 'يمكنك إرسال 3 إعلانات فقط خلال ساعة واحدة. حاول لاحقاً.' }
+
+    const duplicateIdentity = JSON.stringify({ userId: session.user.id, category, make, model, year: category === 'cars' ? draft.year : new Date().getFullYear(), condition: draft.condition, mileage: category === 'cars' && draft.condition === 'used' && !draft.mileageUnknown ? draft.mileage : 0, askingPrice: draft.askingPrice, city, details })
+    if (!await consumeRateLimit('listing-duplicate', duplicateIdentity, 1, 5 * 60_000)) return { success: false, message: 'تم استلام إعلان مطابق مؤخراً. لا تعِد إرساله.' }
+
+    const duplicate = await db.select({ id: carListings.id }).from(carListings).where(and(
+      eq(carListings.userId, session.user.id),
+      eq(carListings.category, category),
+      eq(carListings.make, make),
+      eq(carListings.model, model),
+      eq(carListings.year, category === 'cars' ? draft.year : new Date().getFullYear()),
+      eq(carListings.condition, draft.condition),
+      eq(carListings.mileage, category === 'cars' && draft.condition === 'used' && !draft.mileageUnknown ? draft.mileage : 0),
+      eq(carListings.askingPrice, draft.askingPrice),
+      eq(carListings.city, city),
+      sql`${carListings.details} = ${JSON.stringify(details)}::jsonb`,
+      or(eq(carListings.status, 'pending'), eq(carListings.status, 'approved')),
+    )).limit(1)
+    if (duplicate.length) return { success: false, message: 'يوجد إعلان مطابق قيد المراجعة أو منشور بالفعل. حدّث الإعلان الحالي بدلاً من تكراره.' }
+
     await db.insert(carListings).values({
       id: crypto.randomUUID(),
       userId: session.user.id,
@@ -379,13 +428,6 @@ export async function resubmitRejectedListing(listingId: string, draft: ListingD
       .limit(1)
     if (!listing) return { success: false, message: 'لا يمكن تعديل هذا الإعلان؛ تأكد أنه مرفوض ومن حسابك.' }
 
-    const requestHeaders = await headers()
-    const limits = await Promise.all([
-      consumeRateLimit('listing-resubmit-user', session.user.id, 3, 15 * 60_000),
-      consumeRateLimit('listing-resubmit-ip', getClientAddress(requestHeaders), 10, 60 * 60_000),
-    ])
-    if (limits.some((allowed) => !allowed)) return { success: false, message: 'تجاوزت حد إعادة إرسال الإعلانات. حاول لاحقاً.' }
-
     if (draft.verificationImageUpdated && !uploadedVerificationImage) {
       return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
     }
@@ -428,6 +470,32 @@ export async function resubmitRejectedListing(listingId: string, draft: ListingD
     if (!verificationImage || !isOwnedPublicBlobUrl(verificationImage, 'verification', session.user.id)) {
       return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
     }
+
+    const requestHeaders = await headers()
+    const limits = await Promise.all([
+      consumeRateLimit('listing-user', session.user.id, 3, 60 * 60_000),
+      consumeRateLimit('listing-ip', getClientAddress(requestHeaders), 10, 60 * 60_000),
+    ])
+    if (limits.some((allowed) => !allowed)) return { success: false, message: 'يمكنك إرسال 3 إعلانات فقط خلال ساعة واحدة. حاول لاحقاً.' }
+
+    const duplicateIdentity = JSON.stringify({ userId: session.user.id, listingId, category, make, model, year: category === 'cars' ? draft.year : new Date().getFullYear(), condition: draft.condition, mileage: category === 'cars' && draft.condition === 'used' && !draft.mileageUnknown ? draft.mileage : 0, askingPrice: draft.askingPrice, city, details })
+    if (!await consumeRateLimit('listing-duplicate', duplicateIdentity, 1, 5 * 60_000)) return { success: false, message: 'تم استلام طلب إعادة إرسال مطابق مؤخراً.' }
+
+    const duplicate = await db.select({ id: carListings.id }).from(carListings).where(and(
+      eq(carListings.userId, session.user.id),
+      ne(carListings.id, listingId),
+      eq(carListings.category, category),
+      eq(carListings.make, make),
+      eq(carListings.model, model),
+      eq(carListings.year, category === 'cars' ? draft.year : new Date().getFullYear()),
+      eq(carListings.condition, draft.condition),
+      eq(carListings.mileage, category === 'cars' && draft.condition === 'used' && !draft.mileageUnknown ? draft.mileage : 0),
+      eq(carListings.askingPrice, draft.askingPrice),
+      eq(carListings.city, city),
+      sql`${carListings.details} = ${JSON.stringify(details)}::jsonb`,
+      or(eq(carListings.status, 'pending'), eq(carListings.status, 'approved')),
+    )).limit(1)
+    if (duplicate.length) return { success: false, message: 'يوجد إعلان مطابق قيد المراجعة أو منشور بالفعل. حدّث الإعلان الحالي بدلاً من تكراره.' }
 
     const updated = await db
       .update(carListings)

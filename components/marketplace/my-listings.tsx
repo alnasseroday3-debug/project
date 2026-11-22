@@ -112,7 +112,7 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
         {visibleListings.length ? <div className="my-listings-grid">{visibleListings.map((car) => {
           const category = car.category ?? 'cars'
           const isCar = category === 'cars'
-          const title = isCar ? car.model : [car.make, car.model].filter(Boolean).join(' ')
+          const title = isCar ? car.model : car.make || car.model
           const isAdminArchived = car.status === 'archived' && car.archivedByAdmin
           const isExpiryArchived = car.status === 'archived' && car.archivedByExpiry
           const status = listingStatus[car.status as keyof typeof listingStatus] ?? listingStatus.pending

@@ -75,7 +75,7 @@ function conditionLabel(listing: HomeListing) {
 function ListingCard({ listing }: { listing: HomeListing }) {
   const category = listing.category ?? 'cars'
   const isCar = category === 'cars'
-  const title = [listing.make, listing.model].filter(Boolean).join(' ')
+  const title = isCar ? [listing.make, listing.model].filter(Boolean).join(' ') : listing.make || listing.model
   const detailBadges = [listing.details?.itemType, listing.details?.brand, listing.details?.size].filter(Boolean)
   const CategoryIcon = categoryIcons[category]
   const photo = carImageUrl(listing)

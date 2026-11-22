@@ -28,15 +28,22 @@ function AdminCategoryFacts({ car }: { car: CarListing }) {
   if (category === 'cars') return null
   const selected = (field: string, otherField: string) => details[field] === 'other' ? details[otherField] ?? '' : details[field] ?? ''
   const type = category === 'real_estate' ? selected('propertyType', 'propertyTypeOther') : selected('itemType', 'itemTypeOther')
+  const brand = selected('brand', 'brandOther')
   const facts = category === 'real_estate'
-    ? [['نوع العقار', type], ['المساحة', details.areaSqm ? `${details.areaSqm} م²` : ''], ['الغرف', details.rooms], ['الطابق', details.floor], ['الحالة', details.condition || details.propertyCondition], ['الملكية', selected('ownershipType', 'ownershipOther')]]
+    ? [['نوع العقار', type], ['المساحة', details.areaSqm ? `${details.areaSqm} م²` : ''], ['الغرف', details.rooms], ['الطابق', selected('floor', 'floorOther')], ['الإكساء', selected('propertyCondition', 'propertyConditionOther')], ['الملكية', selected('ownershipType', 'ownershipOther')]]
     : category === 'furniture'
-      ? [['نوع الأثاث', type], ['الحالة', details.condition]]
+      ? [['نوع الأثاث', type], ['الحالة', details.condition], ['القطع أو الخشب', details.piecesOrWood]]
       : category === 'appliances'
-        ? [['نوع الأداة', type], ['الماركة', details.brand], ['الحالة', details.condition]]
+        ? [['نوع الأداة', type], ['الماركة', brand], ['السعة أو الاستطاعة', details.capacity], ['الحالة', details.condition]]
         : category === 'electronics'
-          ? [['نوع الجهاز', type], ['السعة والمواصفات', details.specifications], ['الحالة', details.condition]]
-          : [['النوع', type], ['صفة البائع', details.sellerType], ['المقاسات', details.size], ['الحالة', details.condition]]
+          ? details.itemType === 'موبايل'
+            ? [['الجهاز', type], ['الماركة', brand], ['الموديل', details.deviceModel], ['السعة التخزينية', selected('storage', 'storageOther')], ['الرام', selected('ram', 'ramOther')], ['الحالة', details.condition], ['الجمركة', details.customsStatus], ['الملحقات', details.accessories]]
+            : ['لابتوب', 'كمبيوتر مكتبي', 'كمبيوتر'].includes(details.itemType ?? '')
+              ? [['النوع', type], ['الماركة', brand], ['المعالج', selected('processor', 'processorOther')], ['الرام', selected('ram', 'ramOther')], ['التخزين', selected('storage', 'storageOther')], ['كرت الشاشة', details.graphicsModel ? `${details.graphicsType} · ${details.graphicsModel}` : details.graphicsType], ['تبديل قطع أو صيانة', details.partsChanged === 'yes' ? 'نعم، تم التبديل' : details.partsChanged === 'no' ? 'لا، وكالة' : ''], ['مدة الاستعمال', `${details.usageMonths ?? 0} شهر`]]
+              : details.itemType === 'بلايستيشن وألعاب'
+                ? [['النوع', type], ['الجهاز', selected('gameConsole', 'gameConsoleOther')], ['نسخة الجهاز', details.gameMedia], ['عدد القبضات', details.controllerCount], ['حالة النظام', details.gameStatus]]
+                : [['النوع', type], ['الماركة', brand], ['المواصفات', details.specifications], ['الحالة', details.condition]]
+          : [['النوع', type], ['صفة البائع', details.sellerType], ['اسم المحل', details.shopName], ['المقاسات', details.size], ['الحالة', details.condition]]
   return <div className="admin-market-details" aria-label={`مواصفات ${listingCategoryLabels[category]}`}>{facts.filter(([, value]) => value).map(([label, value]) => <span key={label}><strong>{label}:</strong> {value}</span>)}</div>
 }
 
@@ -55,7 +62,7 @@ function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onRe
     <article className="admin-card admin-record-card">
       <div className="admin-card-photo"><CarPhoto src={photos[0] || carImageUrl(car)} alt={`${car.make} ${car.model}`} width={520} height={360} /></div>
       <div className="admin-card-info">
-        <div className="admin-card-title"><div><span className="listing-make">{isCar ? car.make : listingCategoryLabels[category]}</span><h2>{isCar ? car.model : car.make} {isCar && <small>{car.year}</small>}</h2>{!isCar && car.model && <small>{car.model}</small>}</div><span className={`pending-pill ${archived ? 'is-archived' : 'is-published'}`}>{archived ? <Archive aria-hidden="true" /> : <BadgeCheck aria-hidden="true" />}{archived ? 'ضمن الأرشيف' : 'منشور حالياً'}</span></div>
+        <div className="admin-card-title"><div><span className="listing-make">{isCar ? car.make : listingCategoryLabels[category]}</span><h2>{isCar ? car.model : car.make} {isCar && <small>{car.year}</small>}</h2></div><span className={`pending-pill ${archived ? 'is-archived' : 'is-published'}`}>{archived ? <Archive aria-hidden="true" /> : <BadgeCheck aria-hidden="true" />}{archived ? 'ضمن الأرشيف' : 'منشور حالياً'}</span></div>
         {archived && <span className={`archive-source-badge${isSellerArchived ? ' is-seller-archive' : ''}`}>{isSellerArchived ? 'حُذف بواسطة البائع (تم البيع / أزاله صاحبه)' : car.archivedByAdmin ? 'مؤرشف إدارياً' : 'انتهت مدة العرض'}</span>}
         <p className="admin-description">{car.description || 'لا توجد نبذة عن الإعلان.'}</p>
         <div className="admin-facts"><span dir="ltr">${money.format(car.askingPrice)} USD</span>{isCar && <span>{money.format(car.mileage)} كم</span>}<span><MapPin aria-hidden="true" /> {car.city || 'سوريا'}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName || 'معلن مَسَار'}</span>{car.sellerPhone && <a href={`tel:${car.sellerPhone}`} dir="ltr">{car.sellerPhone}</a>}</div>
@@ -249,7 +256,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
           {activeSection === 'pending' ? visiblePending.map((car) => <article className="admin-card" key={car.id}>
             <div className="admin-card-photo"><CarPhoto src={carImageUrl(car)} alt={`${car.make} ${car.model}`} width={520} height={360} /></div>
             <div className="admin-card-info">
-              <div className="admin-card-title"><div><span className="listing-make">{(car.category ?? 'cars') === 'cars' ? car.make : listingCategoryLabels[car.category ?? 'cars']}</span><h2>{(car.category ?? 'cars') === 'cars' ? car.model : car.make} {(car.category ?? 'cars') === 'cars' && <small>{car.year}</small>}</h2>{(car.category ?? 'cars') !== 'cars' && car.model && <small>{car.model}</small>}</div><span className="pending-pill"><Clock3 aria-hidden="true" /> قيد المراجعة</span></div>
+              <div className="admin-card-title"><div><span className="listing-make">{(car.category ?? 'cars') === 'cars' ? car.make : listingCategoryLabels[car.category ?? 'cars']}</span><h2>{(car.category ?? 'cars') === 'cars' ? car.model : car.make} {(car.category ?? 'cars') === 'cars' && <small>{car.year}</small>}</h2></div><span className="pending-pill"><Clock3 aria-hidden="true" /> قيد المراجعة</span></div>
               <p className="admin-description">{car.description || 'لا توجد نبذة عن الإعلان.'}</p>
               <div className="admin-facts"><span dir="ltr">${money.format(car.askingPrice)} USD</span>{(car.category ?? 'cars') === 'cars' && <span>{car.mileageUnknown ? 'العداد متوقف / لا أعلم' : `${money.format(car.mileage)} كم`}</span>}<span><MapPin aria-hidden="true" /> {car.city}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName}</span></div>
               {(car.category ?? 'cars') === 'cars' ? <div className="admin-market-details"><span><strong>الدهان:</strong> {car.paintCondition === 'clean' ? 'خالية العلام جوا وبرا' : car.paintCondition === 'interior' ? 'خالية من الداخل — زنار' : car.paintCondition === 'panels' ? 'بخ قطعتين أو ثلاث' : 'غير محدد'}{car.paintDetails ? ` — ${car.paintDetails}` : ''}</span><span><strong>الفيتيس:</strong> {car.transmission === 'automatic' ? 'أوتوماتيك' : car.transmission === 'manual' ? 'عادي' : 'غير محدد'}</span><span><strong>الوقود:</strong> {car.fuelType === 'gasoline' ? 'بنزين' : car.fuelType === 'diesel' ? 'مازوت' : car.fuelType === 'hybrid' ? 'هايبرد' : car.fuelType === 'electric' ? 'كهرباء' : 'غير محدد'}</span><span><strong>الأوراق:</strong> {car.registrationStatus === 'syrian' ? 'نمرة سورية نظامية' : car.registrationStatus === 'new-entry' ? 'إدخال جديد' : car.registrationStatus === 'customs-cleared' ? 'مجمركة' : car.registrationStatus === 'immediate-transfer' ? 'فراغ فوري' : 'غير محددة'}</span><span><strong>السعر:</strong> {car.negotiable ? 'قابل للتفاوض' : 'غير قابل للتفاوض'}</span><span><strong>التواصل:</strong> {car.whatsappOnly ? 'واتساب فقط' : 'واتساب أو اتصال'}</span></div> : <AdminCategoryFacts car={car} />}

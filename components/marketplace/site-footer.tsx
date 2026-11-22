@@ -21,7 +21,7 @@ export function SiteFooter({ isAdmin }: { isAdmin: boolean }) {
         <div className="footer-location">
           <span className="footer-title">منصتك الموثوقة</span>
           <span>سوق محلي لبيع وشراء احتياجاتك بكل شفافية</span>
-          <span><AtSign aria-hidden="true" /> masar.cars</span>
+          <span><AtSign aria-hidden="true" /> masar.sy</span>
         </div>
       </div>
       <div className="footer-bottom">

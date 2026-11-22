@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     })
     .from(carListings)
     .where(and(...filters))
-    .orderBy(desc(carListings.publishedAt))
+    .orderBy(sql`${carListings.publishedAt} DESC NULLS LAST`, desc(carListings.createdAt))
     .limit(pageSize + 1)
     .offset(offset)
 

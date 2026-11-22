@@ -61,6 +61,13 @@ const registrationChoices = [
   { value: 'customs-cleared', label: 'مجمركة' },
   { value: 'immediate-transfer', label: 'فراغ فوري' },
 ]
+const phoneBrands = ['آيفون / أبل', 'سامسونج', 'شاومي / ريدمي', 'هواوي', 'أوبو', 'ريلمي', 'إنفينيكس', 'تكنو']
+const computerBrands = ['ديل', 'HP', 'لينوفو', 'أسوس', 'أبل ماك', 'MSI', 'تجميعة مكتبية']
+const applianceBrands = ['سامسونج', 'LG', 'بوش', 'بيكو', 'أريستون', 'هاير', 'هايسنس', 'ميديا', 'جري', 'دايكن']
+const memoryOptions = ['4GB', '6GB', '8GB', '12GB', '16GB', '32GB', '64GB']
+const storageOptions = ['64GB', '128GB', '256GB', '512GB', '1TB']
+const processorOptions = ['Core i3', 'Core i5', 'Core i7', 'Core i9', 'Ryzen 5', 'Ryzen 7', 'Apple M1-M3']
+const computerStorageOptions = ['256GB SSD', '512GB SSD', '1TB SSD', 'HDD+SSD']
 
 function DetailSelect({ label, name, field, options, details, onChange, otherField }: {
   label: string
@@ -250,9 +257,26 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
     setDetails((current) => ({ ...current, [field]: value }))
   }
 
+  function selectedDetail(field: string, otherField: string) {
+    return details[field] === 'other' ? details[otherField] ?? '' : details[field] ?? ''
+  }
+
   function getSelectedItemType() {
     if (category === 'real_estate') return details.propertyType === 'other' ? details.propertyTypeOther ?? '' : details.propertyType ?? ''
     return details.itemType === 'other' ? details.itemTypeOther ?? '' : details.itemType ?? ''
+  }
+
+  function getGeneratedTitle() {
+    if (category === 'cars') return [make, model].filter(Boolean).join(' ')
+    const itemType = getSelectedItemType()
+    if (category === 'real_estate') return [itemType, details.ownershipType === 'other' ? details.ownershipOther : details.ownershipType, details.areaSqm ? `${details.areaSqm} م²` : ''].filter(Boolean).join(' ')
+    if (category === 'electronics' && details.itemType === 'موبايل') return [`موبايل ${details.brand === 'other' ? details.brandOther : details.brand}`, details.deviceModel, details.storage === 'other' ? details.storageOther : details.storage ? `— ${details.storage}` : ''].filter(Boolean).join(' ')
+    if (category === 'electronics' && ['لابتوب', 'كمبيوتر مكتبي'].includes(details.itemType ?? '')) return [itemType, details.brand === 'other' ? details.brandOther : details.brand, details.processor === 'other' ? details.processorOther : details.processor].filter(Boolean).join(' ')
+    if (category === 'electronics' && details.itemType === 'بلايستيشن وألعاب') return [selectedDetail('gameConsole', 'gameConsoleOther'), details.gameMedia].filter(Boolean).join(' — ')
+    if (category === 'appliances') return [itemType, details.brand === 'other' ? details.brandOther : details.brand, details.capacity].filter(Boolean).join(' ')
+    if (category === 'furniture') return [itemType, details.piecesOrWood].filter(Boolean).join(' — ')
+    if (category === 'fashion') return [itemType, details.shopName, details.size].filter(Boolean).join(' — ')
+    return [itemType, details.brand === 'other' ? details.brandOther : details.brand, details.specifications].filter(Boolean).join(' ')
   }
 
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
@@ -363,12 +387,12 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
 
       const categoryCondition = category === 'real_estate' ? details.propertyCondition : details.condition
       const submittedDetails = category === 'real_estate'
-        ? { ...details, district: details.district ?? '', condition: details.propertyCondition ?? '' }
+        ? { ...details, district: details.district ?? '', condition: details.propertyCondition === 'other' ? details.propertyConditionOther ?? '' : details.propertyCondition ?? '' }
         : { ...details, district: details.district ?? '' }
       const draft = {
         category,
         details: submittedDetails,
-        make,
+        make: category === 'cars' ? make : getGeneratedTitle().slice(0, 80),
         model: category === 'cars' ? model : getSelectedItemType(),
         year: category === 'cars' ? Number(year) : currentYear,
         condition: category === 'cars' ? condition : categoryCondition === 'جديد' ? 'new' as const : 'used' as const,
@@ -467,7 +491,7 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
                   <label className="form-checkbox mileage-unknown"><input type="checkbox" checked={mileageUnknown} onChange={(event) => setMileageUnknown(event.target.checked)} /><span>العداد متوقف / لا أعلم</span></label>
                   <label className="form-field"><span>مدة الاستخدام <small>اختياري · بالأشهر</small></span><input className="plain-input" type="number" inputMode="numeric" min="0" max="1200" value={usageMonths} onChange={(event) => setUsageMonths(event.target.value)} placeholder="مثال: 24" /></label>
                 </>}
-              </> : <label className="form-field form-field-wide"><span>اسم الإعلان</span><input className="plain-input" value={make} onChange={(event) => setMake(event.target.value)} placeholder="مثال: شقة بإطلالة على المدينة أو طقم كنب" maxLength={80} required /></label>}
+              </> : <div className="form-field form-field-wide"><span>عنوان الإعلان</span><p className="generated-listing-title" aria-live="polite">{getGeneratedTitle() || 'سيُنشأ تلقائياً من اختياراتك في الخطوة التالية'}</p></div>}
               <label className="form-field"><span>السعر بالدولار الأمريكي ($)</span><input className="plain-input" type="number" inputMode="numeric" min={category === 'cars' ? 1000 : 1} max="100000000" value={askingPrice} onChange={(event) => setAskingPrice(event.target.value)} placeholder="أدخل السعر بالدولار" required /></label>
               <label className="form-checkbox negotiable-toggle"><input type="checkbox" checked={negotiable} onChange={(event) => setNegotiable(event.target.checked)} /><span>السعر قابل للتفاوض</span></label>
               <label className="form-field"><span>المحافظة</span><select className="plain-input" value={city} onChange={(event) => setCity(event.target.value)} required><option value="">اختر المحافظة</option>{syrianGovernorates.map((governorate) => <option value={governorate} key={governorate}>{governorate}</option>)}{existingCityNotListed && <option value={city}>{city} (القيمة الحالية)</option>}</select></label>
@@ -499,32 +523,65 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
             </> : <div className="form-grid market-specs-grid dynamic-specs-grid">
               {category === 'real_estate' && <>
                 <DetailSelect label="نوع العقار" name="propertyType" field="propertyType" otherField="propertyTypeOther" details={details} onChange={setDetail} options={['شقة', 'بيت عربي', 'مزرعة', 'محل تجاري', 'أرض']} />
-                <label className="form-field"><span>المساحة بالمتر المربع</span><input className="plain-input" type="number" min="1" inputMode="numeric" value={details.areaSqm ?? ''} onChange={(event) => setDetail('areaSqm', event.target.value)} placeholder="مثال: 120" required /></label>
+                <label className="form-field"><span>المساحة بالمتر المربع</span><input className="plain-input" type="number" min="1" inputMode="numeric" value={details.areaSqm ?? ''} onChange={(event) => setDetail('areaSqm', event.target.value)} placeholder="مثال: 130" required /></label>
                 <label className="form-field"><span>عدد الغرف</span><input className="plain-input" type="number" min="0" inputMode="numeric" value={details.rooms ?? ''} onChange={(event) => setDetail('rooms', event.target.value)} placeholder="مثال: 3" required /></label>
-                <label className="form-field"><span>الطابق</span><input className="plain-input" value={details.floor ?? ''} onChange={(event) => setDetail('floor', event.target.value)} placeholder="مثال: أرضي، أول، أو طابق 3" maxLength={40} required /></label>
-                <ChoiceField label="حالة العقار" name="propertyCondition" value={details.propertyCondition ?? ''} options={['سوبر ديلوكس', 'على العضم', 'مفروش', 'عادي'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('propertyCondition', value)} />
+                <DetailSelect label="الطابق" name="floor" field="floor" otherField="floorOther" details={details} onChange={setDetail} options={['قبو', 'أرضي', 'أول', 'ثاني', 'ثالث', 'رابع', 'خامس', 'أخير']} />
+                <DetailSelect label="الإكساء" name="propertyCondition" field="propertyCondition" otherField="propertyConditionOther" details={details} onChange={setDetail} options={['سوبر ديلوكس', 'على العضم', 'مفروش', 'عادي']} />
                 <DetailSelect label="نوع الملكية" name="ownershipType" field="ownershipType" otherField="ownershipOther" details={details} onChange={setDetail} options={['طابو أخضر', 'حكم محكمة', 'كاتب عدل']} />
               </>}
               {category === 'furniture' && <>
-                <DetailSelect label="نوع الأثاث" name="furnitureType" field="itemType" otherField="itemTypeOther" details={details} onChange={setDetail} options={['غرفة نوم', 'طقم كنب', 'سفرة', 'مطبخ', 'سجاد وموكيت', 'مكاتب']} />
+                <DetailSelect label="نوع الأثاث" name="furnitureType" field="itemType" otherField="itemTypeOther" details={details} onChange={setDetail} options={['غرفة نوم', 'طقم كنب', 'غرفة سفرة', 'مطبخ', 'سجاد وموكيت', 'طاولات ومكاتب']} />
                 <ChoiceField label="الحالة" name="furnitureCondition" value={details.condition ?? ''} options={['جديد', 'مستعمل نظيف', 'مستعمل'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('condition', value)} />
+                <label className="form-field form-field-wide"><span>عدد القطع أو نوع الخشب</span><input className="plain-input" value={details.piecesOrWood ?? ''} onChange={(event) => setDetail('piecesOrWood', event.target.value)} placeholder="مثال: 6 قطع، خشب زان" maxLength={120} required /></label>
               </>}
               {category === 'appliances' && <>
-                <DetailSelect label="نوع الأداة" name="applianceType" field="itemType" otherField="itemTypeOther" details={details} onChange={setDetail} options={['براد', 'غسالة', 'مكيف', 'شاشة', 'غاز/فرن', 'منظومة طاقة شمسية/بطاريات/إنفرتر']} />
-                <label className="form-field"><span>الماركة</span><input className="plain-input" value={details.brand ?? ''} onChange={(event) => setDetail('brand', event.target.value)} placeholder="اكتب الماركة" maxLength={80} required /></label>
+                <DetailSelect label="نوع الأداة أو منظومة الطاقة" name="applianceType" field="itemType" otherField="itemTypeOther" details={details} onChange={setDetail} options={['براد', 'غسالة', 'مكيف', 'شاشة', 'غاز/فرن', 'منظومة طاقة شمسية/ألواح/بطاريات/إنفرتر']} />
+                <DetailSelect label="الماركة" name="applianceBrand" field="brand" otherField="brandOther" details={details} onChange={setDetail} options={applianceBrands} />
+                <label className="form-field"><span>السعة أو الاستطاعة</span><input className="plain-input" value={details.capacity ?? ''} onChange={(event) => setDetail('capacity', event.target.value)} placeholder="مثال: 18 ألف وحدة، 5 كيلوواط" maxLength={100} required /></label>
                 <ChoiceField label="الحالة" name="applianceCondition" value={details.condition ?? ''} options={['جديد', 'مستعمل'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('condition', value)} />
               </>}
               {category === 'electronics' && <>
-                <DetailSelect label="نوع الجهاز" name="electronicsType" field="itemType" otherField="itemTypeOther" details={details} onChange={setDetail} options={['موبايل', 'لابتوب', 'كمبيوتر', 'تابلت', 'بلايستيشن وألعاب', 'كاميرات وإكسسوارات']} />
-                <label className="form-field"><span>السعة أو المواصفات</span><input className="plain-input" value={details.specifications ?? ''} onChange={(event) => setDetail('specifications', event.target.value)} placeholder="مثال: 256 جيجابايت، ذاكرة 16 جيجابايت" maxLength={150} required /></label>
-                <ChoiceField label="الحالة" name="electronicsCondition" value={details.condition ?? ''} options={['جديد', 'مستعمل نظيف'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('condition', value)} />
+                <DetailSelect label="نوع الجهاز" name="electronicsType" field="itemType" otherField="itemTypeOther" details={details} onChange={setDetail} options={['موبايل', 'لابتوب', 'كمبيوتر مكتبي', 'بلايستيشن وألعاب', 'تابلت', 'كاميرات', 'إكسسوارات', 'أخرى']} />
+                {details.itemType === 'موبايل' && <>
+                  <DetailSelect label="الماركة" name="phoneBrand" field="brand" otherField="brandOther" details={details} onChange={setDetail} options={phoneBrands} />
+                  <label className="form-field"><span>الموديل</span><input className="plain-input" value={details.deviceModel ?? ''} onChange={(event) => setDetail('deviceModel', event.target.value)} placeholder="مثال: Galaxy S24 أو iPhone 15" maxLength={80} required /></label>
+                  <DetailSelect label="السعة التخزينية" name="phoneStorage" field="storage" otherField="storageOther" details={details} onChange={setDetail} options={storageOptions} />
+                  <DetailSelect label="الرام" name="phoneMemory" field="ram" otherField="ramOther" details={details} onChange={setDetail} options={['4GB', '6GB', '8GB', '12GB', '16GB']} />
+                  <ChoiceField label="الحالة" name="phoneCondition" value={details.condition ?? ''} options={['جديد زيرو', 'مستعمل نظيف كالوكالة', 'مستعمل'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('condition', value)} />
+                  <ChoiceField label="الجمركة" name="customsStatus" value={details.customsStatus ?? ''} options={['مجمرك نظامي', 'غير مجمرك'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('customsStatus', value)} />
+                  <ChoiceField label="الملحقات" name="accessories" value={details.accessories ?? ''} options={['مع العلبة والشاحن', 'جهاز فقط'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('accessories', value)} />
+                </>}
+                {['لابتوب', 'كمبيوتر مكتبي'].includes(details.itemType ?? '') && <>
+                  <DetailSelect label="الماركة" name="computerBrand" field="brand" otherField="brandOther" details={details} onChange={setDetail} options={computerBrands} />
+                  <DetailSelect label="المعالج" name="processor" field="processor" otherField="processorOther" details={details} onChange={setDetail} options={processorOptions} />
+                  <DetailSelect label="الرام" name="computerMemory" field="ram" otherField="ramOther" details={details} onChange={setDetail} options={['8GB', '16GB', '32GB', '64GB']} />
+                  <DetailSelect label="التخزين" name="computerStorage" field="storage" otherField="storageOther" details={details} onChange={setDetail} options={computerStorageOptions} />
+                  <ChoiceField label="كرت الشاشة" name="graphicsType" value={details.graphicsType ?? ''} options={['مدمج', 'منفصل NVIDIA/AMD'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('graphicsType', value)} />
+                  {details.graphicsType === 'منفصل NVIDIA/AMD' && <label className="form-field"><span>نوع كرت الشاشة</span><input className="plain-input" value={details.graphicsModel ?? ''} onChange={(event) => setDetail('graphicsModel', event.target.value)} placeholder="مثال: NVIDIA RTX 4060" maxLength={80} required /></label>}
+                  <ChoiceField label="هل تم تبديل قطع أو صيانة؟" name="partsChanged" value={details.partsChanged ?? ''} options={[{ value: 'no', label: 'لا، وكالة' }, { value: 'yes', label: 'نعم، تم التبديل' }]} onChange={(value) => setDetail('partsChanged', value)} />
+                  <label className="form-field"><span>مدة الاستعمال <small>بالأشهر</small></span><input className="plain-input" type="number" min="0" max="1200" inputMode="numeric" value={details.usageMonths ?? ''} onChange={(event) => setDetail('usageMonths', event.target.value)} placeholder="مثال: 12" required /></label>
+                </>}
+                {details.itemType === 'بلايستيشن وألعاب' && <>
+                  <DetailSelect label="الجهاز" name="gameConsole" field="gameConsole" otherField="gameConsoleOther" details={details} onChange={setDetail} options={['PS5', 'PS4 Pro', 'PS4 Slim', 'Xbox Series X/S', 'نينتندو سويتش']} />
+                  <ChoiceField label="نوع النسخة" name="gameMedia" value={details.gameMedia ?? ''} options={['نسخة أقراص CD', 'ديجيتال'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('gameMedia', value)} />
+                  <label className="form-field"><span>عدد القبضات</span><select className="plain-input" value={details.controllerCount ?? ''} onChange={(event) => setDetail('controllerCount', event.target.value)} required><option value="">اختر العدد</option>{['1', '2', '3', '4', 'أكثر من 4'].map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
+                  <ChoiceField label="حالة النظام" name="gameStatus" value={details.gameStatus ?? ''} options={['أونلاين نظامي', 'مهكّر مع ألعاب'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('gameStatus', value)} />
+                </>}
+                {['تابلت', 'كاميرات', 'إكسسوارات', 'أخرى', 'other'].includes(details.itemType ?? '') && <>
+                  <DetailSelect label="الماركة" name="generalElectronicsBrand" field="brand" otherField="brandOther" details={details} onChange={setDetail} options={[...phoneBrands, ...computerBrands, 'Canon', 'Sony', 'نيكون']} />
+                  <label className="form-field form-field-wide"><span>المواصفات</span><input className="plain-input" value={details.specifications ?? ''} onChange={(event) => setDetail('specifications', event.target.value)} placeholder="اكتب أبرز المواصفات" maxLength={150} required /></label>
+                  <ChoiceField label="الحالة" name="generalElectronicsCondition" value={details.condition ?? ''} options={['جديد زيرو', 'مستعمل نظيف كالوكالة', 'مستعمل'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('condition', value)} />
+                </>}
               </>}
               {category === 'fashion' && <>
                 <DetailSelect label="نوع الملابس أو المنتجات" name="fashionType" field="itemType" otherField="itemTypeOther" details={details} onChange={setDetail} options={['رجالي', 'نسائي', 'أطفال', 'أحذية وحقائب', 'بالة أوروبية']} />
                 <ChoiceField label="صفة البائع" name="sellerType" value={details.sellerType ?? ''} options={['فرد', 'محل تجاري', 'مول'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('sellerType', value)} />
+                {['محل تجاري', 'مول'].includes(details.sellerType ?? '') && <label className="form-field"><span>اسم المحل أو المول</span><input className="plain-input" value={details.shopName ?? ''} onChange={(event) => setDetail('shopName', event.target.value)} placeholder="اكتب اسم المحل" maxLength={100} required /></label>}
                 <label className="form-field"><span>المقاسات</span><select className="plain-input" value={details.size ?? ''} onChange={(event) => setDetail('size', event.target.value)} required><option value="">اختر المقاس</option>{['XS', 'S', 'M', 'L', 'XL', 'XXL', 'مقاس موحد', 'تشكيلة مقاسات متنوعة'].map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
                 <ChoiceField label="الحالة" name="fashionCondition" value={details.condition ?? ''} options={['جديد', 'بالة فرز أول', 'مستعمل'].map((value) => ({ value, label: value }))} onChange={(value) => setDetail('condition', value)} />
               </>}
+              <div className="form-field form-field-wide"><span>عنوان الإعلان التلقائي</span><p className="generated-listing-title" aria-live="polite">{getGeneratedTitle() || 'أكمل المواصفات لتكوين عنوان الإعلان'}</p></div>
+
             </div>}
           </div>
 
@@ -546,7 +603,7 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
             <div className="form-grid contact-fields">
               <label className="form-field form-field-wide"><span>رقم واتساب للتواصل <small>مطلوب</small></span><input className="plain-input" type="tel" inputMode="tel" value={sellerPhone} onChange={(event) => setSellerPhone(event.target.value)} placeholder="+963 9XX XXX XXX" pattern="\+?[0-9\s()-]{8,20}" required /></label>
               <label className="form-checkbox form-field-wide"><input type="checkbox" checked={whatsappOnly} onChange={(event) => setWhatsappOnly(event.target.checked)} /><span>التواصل عبر واتساب فقط</span></label>
-              <label className="form-field form-field-wide"><span>ملاحظات إضافية <small>اختياري</small></span><textarea className="plain-input plain-textarea" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="أضف أي تفاصيل تهم المشتري" maxLength={1200} /></label>
+              <label className="form-field form-field-wide"><span>ملاحظات إضافية <small>اختياري</small></span><textarea className="plain-input plain-textarea" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={category === 'cars' ? 'اذكر حالة السيارة وأي تفاصيل غير موجودة ضمن المواصفات.' : category === 'real_estate' ? 'أضف تفاصيل الموقع والخدمات المحيطة بالعقار.' : category === 'furniture' ? 'أضف تفاصيل عن المقاسات أو حالة القطع.' : category === 'appliances' ? 'أضف تفاصيل التشغيل أو الملحقات المتوفرة.' : category === 'electronics' ? 'أضف تفاصيل عن الاستخدام أو الملحقات.' : 'أضف تفاصيل عن المقاسات أو التشكيلة المتوفرة.'} maxLength={1200} /></label>
             </div>
             <label className="upload-dropzone verification-upload">
               <input type="file" accept="image/jpeg,image/png,image/webp" disabled={compressing || busy} onChange={handleVerificationFile} aria-label="صورة التحقق وإثبات الجدية" required={!existingListing?.hasVerificationImage} />
