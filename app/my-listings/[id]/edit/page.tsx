@@ -21,6 +21,8 @@ export default async function EditRejectedListingPage({ params }: EditListingPag
       id: carListings.id,
       make: carListings.make,
       model: carListings.model,
+      category: carListings.category,
+      details: carListings.details,
       year: carListings.year,
       condition: carListings.condition,
       mileage: carListings.mileage,

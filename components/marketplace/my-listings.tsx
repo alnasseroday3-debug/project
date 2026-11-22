@@ -9,6 +9,7 @@ import { CarPhoto } from '@/components/marketplace/car-photo'
 import { carImageUrl } from '@/lib/car-image-url'
 import { listingAgeLabel } from '@/lib/listing-age'
 import type { OwnerCarListing } from '@/lib/db/schema'
+import { listingCategoryLabels } from '@/lib/listing-categories'
 
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 const daysUntilExpiry = (expiresAt: Date | null) => expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null
@@ -104,11 +105,14 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
     <>
       <main className="my-listings-page page-container">
         <div className="my-listings-heading">
-          <div><span className="eyebrow eyebrow-green">مساحتك في مَسَار</span><h1>إعلاناتي</h1><p>تابع حالة سياراتك المنشورة أو التي ما زالت قيد المراجعة.</p></div>
-          <Link className="primary-button" href="/sell">إضافة سيارة <ArrowLeft aria-hidden="true" /></Link>
+          <div><span className="eyebrow eyebrow-green">مساحتك في مَسَار</span><h1>إعلاناتي</h1><p>تابع إعلاناتك المنشورة أو التي ما زالت قيد المراجعة.</p></div>
+          <Link className="primary-button" href="/sell">إضافة إعلان <ArrowLeft aria-hidden="true" /></Link>
         </div>
         {feedback && <p className="my-listings-feedback" role="status">{feedback}</p>}
         {visibleListings.length ? <div className="my-listings-grid">{visibleListings.map((car) => {
+          const category = car.category ?? 'cars'
+          const isCar = category === 'cars'
+          const title = isCar ? car.model : [car.make, car.model].filter(Boolean).join(' ')
           const isAdminArchived = car.status === 'archived' && car.archivedByAdmin
           const isExpiryArchived = car.status === 'archived' && car.archivedByExpiry
           const status = listingStatus[car.status as keyof typeof listingStatus] ?? listingStatus.pending
@@ -117,11 +121,11 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
           const canRenew = (car.status === 'approved' && daysRemaining !== null && daysRemaining <= 5) || isExpiryArchived
           return (
             <article className="my-listing-card" key={car.id}>
-              <div className="my-listing-photo"><CarPhoto src={carImageUrl(car)} alt={`${car.make} ${car.model} ${car.year}`} width={720} height={480} /><span className="listing-age-badge">{listingAgeLabel(car.publishedAt ?? car.createdAt)}</span></div>
+              <div className="my-listing-photo"><CarPhoto src={carImageUrl(car)} alt={title} width={720} height={480} /><span className="listing-age-badge">{listingAgeLabel(car.publishedAt ?? car.createdAt)}</span></div>
               <div className="my-listing-content">
-                <div className="my-listing-top"><span className={`${status.className}${isAdminArchived ? ' is-admin-archived' : ''}`}><StatusIcon aria-hidden="true" />{isAdminArchived ? 'تمت أرشفة الإعلان وإيقافه من قِبل الإدارة' : status.label}</span><span className="my-listing-year">{car.year}</span></div>
-                <p className="listing-make">{car.make}</p>
-                <h2>{car.model}</h2>
+                <div className="my-listing-top"><span className={`${status.className}${isAdminArchived ? ' is-admin-archived' : ''}`}><StatusIcon aria-hidden="true" />{isAdminArchived ? 'تمت أرشفة الإعلان وإيقافه من قِبل الإدارة' : status.label}</span>{isCar && <span className="my-listing-year">{car.year}</span>}</div>
+                <p className="listing-make">{isCar ? car.make : listingCategoryLabels[category]}</p>
+                <h2>{title}</h2>
                 <p className="my-listing-price" dir="ltr">${money.format(car.askingPrice)} USD</p>
                 {isAdminArchived ? <>
                   <section className="my-listing-admin-archive" aria-label="معلومات أرشفة الإدارة">
@@ -129,7 +133,7 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
                   </section>
                   <button type="button" className="my-listing-delete" disabled={isDeleting} onClick={() => setConfirmingListing(car)}><Trash2 aria-hidden="true" />حذف من قائمتي</button>
                 </> : isExpiryArchived ? <>
-                  <p className="my-listing-note">انتهت مدة العرض، ويمكنك تأكيد توفر السيارة لتجديد الإعلان.</p>
+                  <p className="my-listing-note">انتهت مدة العرض، ويمكنك تأكيد توفر الإعلان لتجديده.</p>
                   <button type="button" className="my-listing-renew" onClick={() => setRenewingListing(car)}><RefreshCw aria-hidden="true" />تجديد الإعلان</button>
                 </> : car.status === 'approved' ? <>
                   <Link className="my-listing-link" href={`/cars/${car.id}`}>مشاهدة الإعلان <ArrowLeft aria-hidden="true" /></Link>
@@ -150,7 +154,7 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
               </div>
             </article>
           )
-        })}</div> : <section className="my-listings-empty"><span><FileText aria-hidden="true" /></span><h2>لا توجد إعلانات بعد</h2><p>أضف سيارتك وراجع حالتها من هذه الصفحة في أي وقت.</p><Link className="primary-button" href="/sell">أضف أول إعلان <ArrowLeft aria-hidden="true" /></Link></section>}
+        })}</div> : <section className="my-listings-empty"><span><FileText aria-hidden="true" /></span><h2>لا توجد إعلانات بعد</h2><p>أضف إعلانك وراجع حالته من هذه الصفحة في أي وقت.</p><Link className="primary-button" href="/sell">أضف أول إعلان <ArrowLeft aria-hidden="true" /></Link></section>}
       </main>
       <dialog
         ref={deleteDialogRef}
@@ -188,14 +192,14 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
         <div className="listing-renewal-content">
           <span className="listing-renewal-icon"><RefreshCw aria-hidden="true" /></span>
           <span className="listing-delete-eyebrow">تجديد العرض</span>
-          <h2 id="listing-renewal-title">هل السيارة لا تزال متوفرة لديك ولم تُبع بعد؟</h2>
+          <h2 id="listing-renewal-title">هل لا يزال إعلانك متوفراً ولم يُبع بعد؟</h2>
           <p>اختر الحالة المناسبة؛ لا يتم تجديد الإعلان إلا بعد تأكيدك.</p>
           <div className="listing-renewal-actions">
             <button type="button" className="listing-renewal-confirm" disabled={isRenewing || isDeleting} onClick={confirmRenewal}>
-              <BadgeCheck aria-hidden="true" />{isRenewing ? 'جارٍ تجديد العرض…' : 'نعم، السيارة لا تزال متوفرة — جدّد العرض 30 يوماً'}
+              <BadgeCheck aria-hidden="true" />{isRenewing ? 'جارٍ تجديد العرض…' : 'نعم، الإعلان لا يزال متوفراً — جدّد العرض 30 يوماً'}
             </button>
             <button type="button" className="listing-renewal-sold" disabled={isRenewing || isDeleting} onClick={handleSoldSelection}>
-              <Trash2 aria-hidden="true" />لا، تم بيع السيارة — إزالة الإعلان من العرض
+              <Trash2 aria-hidden="true" />لا، تم البيع — إزالة الإعلان من العرض
             </button>
             <button type="button" className="listing-renewal-cancel" disabled={isRenewing || isDeleting} onClick={() => setRenewingListing(null)}>إلغاء</button>
           </div>

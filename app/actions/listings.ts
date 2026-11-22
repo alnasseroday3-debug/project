@@ -8,8 +8,11 @@ import { carListings } from '@/lib/db/schema'
 import { consumeRateLimit, getClientAddress } from '@/lib/rate-limit'
 import { cookies, headers } from 'next/headers'
 import { deleteListingBlobs, isOwnedPublicBlobUrl, verificationUploadCookie } from '@/lib/blob-storage'
+import { isListingCategory, type ListingCategory, type ListingDetails } from '@/lib/listing-categories'
 
 type ListingDraft = {
+  category?: ListingCategory
+  details?: ListingDetails
   make: string
   model: string
   year: number
@@ -57,6 +60,56 @@ const isVehicleDetailsValid = (draft: ListingDraft) =>
   new Set(['automatic', 'manual']).has(draft.transmission) &&
   new Set(['gasoline', 'diesel', 'hybrid', 'electric']).has(draft.fuelType) &&
   new Set(['syrian', 'new-entry', 'customs-cleared', 'immediate-transfer']).has(draft.registrationStatus)
+
+const categoryDetailKeys: Record<ListingCategory, string[]> = {
+  cars: ['district'],
+  real_estate: ['district', 'propertyType', 'propertyTypeOther', 'areaSqm', 'rooms', 'floor', 'propertyCondition', 'ownershipType', 'ownershipOther', 'condition'],
+  furniture: ['district', 'itemType', 'itemTypeOther', 'condition'],
+  appliances: ['district', 'itemType', 'itemTypeOther', 'brand', 'condition'],
+  electronics: ['district', 'itemType', 'itemTypeOther', 'specifications', 'condition'],
+  fashion: ['district', 'itemType', 'itemTypeOther', 'sellerType', 'size', 'condition'],
+}
+
+function sanitizeDetails(category: ListingCategory, input: unknown): ListingDetails {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
+  const source = input as Record<string, unknown>
+  const details: ListingDetails = {}
+  for (const key of categoryDetailKeys[category]) {
+    const maximum = key === 'specifications' ? 150 : key === 'district' ? 60 : 120
+    const value = cleanText(source[key], maximum)
+    if (value) details[key] = value
+  }
+  return details
+}
+
+function hasSelectedOption(details: ListingDetails, key: string, options: string[], otherKey: string) {
+  if (details[key] === 'other') return Boolean(details[otherKey]?.trim())
+  return options.includes(details[key] ?? '')
+}
+
+function areCategoryDetailsValid(category: ListingCategory, details: ListingDetails) {
+  if (category === 'cars') return true
+  if (category === 'real_estate') {
+    return hasSelectedOption(details, 'propertyType', ['شقة', 'بيت عربي', 'مزرعة', 'محل تجاري', 'أرض'], 'propertyTypeOther') &&
+      /^\d{1,6}$/.test(details.areaSqm ?? '') && Number(details.areaSqm) > 0 &&
+      /^\d{1,3}$/.test(details.rooms ?? '') && Boolean(details.floor?.trim()) &&
+      ['سوبر ديلوكس', 'على العضم', 'مفروش', 'عادي'].includes(details.propertyCondition ?? '') &&
+      hasSelectedOption(details, 'ownershipType', ['طابو أخضر', 'حكم محكمة', 'كاتب عدل'], 'ownershipOther')
+  }
+  const typeOptions: Record<Exclude<ListingCategory, 'cars' | 'real_estate'>, string[]> = {
+    furniture: ['غرفة نوم', 'طقم كنب', 'سفرة', 'مطبخ', 'سجاد وموكيت', 'مكاتب'],
+    appliances: ['براد', 'غسالة', 'مكيف', 'شاشة', 'غاز/فرن', 'منظومة طاقة شمسية/بطاريات/إنفرتر'],
+    electronics: ['موبايل', 'لابتوب', 'كمبيوتر', 'تابلت', 'بلايستيشن وألعاب', 'كاميرات وإكسسوارات'],
+    fashion: ['رجالي', 'نسائي', 'أطفال', 'أحذية وحقائب', 'بالة أوروبية'],
+  }
+  if (!hasSelectedOption(details, 'itemType', typeOptions[category], 'itemTypeOther')) return false
+  if (category === 'furniture') return ['جديد', 'مستعمل نظيف', 'مستعمل'].includes(details.condition ?? '')
+  if (category === 'appliances') return Boolean(details.brand?.trim()) && ['جديد', 'مستعمل'].includes(details.condition ?? '')
+  if (category === 'electronics') return Boolean(details.specifications?.trim()) && ['جديد', 'مستعمل نظيف'].includes(details.condition ?? '')
+  return ['فرد', 'محل تجاري', 'مول'].includes(details.sellerType ?? '') &&
+    ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'مقاس موحد', 'تشكيلة مقاسات متنوعة'].includes(details.size ?? '') &&
+    ['جديد', 'بالة فرز أول', 'مستعمل'].includes(details.condition ?? '')
+}
 export async function submitListing(draft: ListingDraft) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { success: false, message: 'سجّل الدخول أولاً لإرسال إعلانك.' }
@@ -72,32 +125,37 @@ export async function submitListing(draft: ListingDraft) {
     ])
     if (limits.some((allowed) => !allowed)) return { success: false, message: 'تجاوزت حد إرسال الإعلانات. حاول لاحقاً.' }
 
-    const make = cleanText(draft.make, 50)
-    const model = cleanText(draft.model, 60)
+    const category = draft.category === undefined ? 'cars' : draft.category
+    if (!isListingCategory(category)) return { success: false, message: 'اختر قسماً صحيحاً للإعلان.' }
+    const details = sanitizeDetails(category, draft.details)
+    const make = cleanText(draft.make, 80)
+    const model = cleanText(draft.model, 120)
     const city = cleanText(draft.city, 60)
     const sellerPhone = cleanText(draft.sellerPhone, 20).replace(/[\s()-]/g, '')
     const description = cleanText(draft.description, 1200)
     const images = Array.isArray(draft.images) ? draft.images : []
     const phoneIsValid = /^\+?[1-9]\d{7,14}$/.test(sellerPhone)
-    const priceIsValid = isWholeNumber(draft.askingPrice, 1000, 100_000_000)
+    const priceIsValid = isWholeNumber(draft.askingPrice, category === 'cars' ? 1000 : 1, 100_000_000)
     const yearIsValid = isWholeNumber(draft.year, 1980, new Date().getFullYear() + 1)
     const conditionIsValid = draft.condition === 'new' || draft.condition === 'used'
     const mileageIsValid = isWholeNumber(draft.mileage, 0, 2_000_000)
     const monthsIsValid = draft.condition === 'new' || isWholeNumber(draft.usageMonths, 0, 1200)
     const booleansAreValid = typeof draft.maintenanceVisited === 'boolean' && typeof draft.repaired === 'boolean' && typeof draft.partsChanged === 'boolean'
-    const negotiationIsValid = (value: unknown) => value === null || isWholeNumber(value, 1000, 100_000_000)
+    const negotiationIsValid = (value: unknown) => value === null || isWholeNumber(value, 1, 100_000_000)
+    const categoryDetailsAreValid = areCategoryDetailsValid(category, details)
+    const vehicleDetailsAreValid = category !== 'cars' || isVehicleDetailsValid(draft)
 
-    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid || !isVehicleDetailsValid(draft)) {
-      return { success: false, message: 'راجِع بيانات السيارة والسعر ورقم التواصل.' }
+    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid || !categoryDetailsAreValid || !vehicleDetailsAreValid) {
+      return { success: false, message: 'راجِع القسم ومواصفات الإعلان والسعر ورقم التواصل.' }
     }
     if (!negotiationIsValid(draft.negotiationMin) || !negotiationIsValid(draft.negotiationMax) || images.length < 1 || images.length > 8) {
       return { success: false, message: 'أضف من صورة واحدة إلى 8 صور، وتحقق من نطاق السعر.' }
     }
-    if (draft.negotiationMin && draft.negotiationMax && draft.negotiationMin > draft.negotiationMax) {
+    if (category === 'cars' && draft.negotiationMin && draft.negotiationMax && draft.negotiationMin > draft.negotiationMax) {
       return { success: false, message: 'الحد الأدنى للتفاوض يجب أن يكون أقل من الحد الأعلى.' }
     }
     if (new Set(images).size !== images.length || images.some((url) => typeof url !== 'string' || !isOwnedPublicBlobUrl(url, 'cars', session.user.id))) {
-      return { success: false, message: 'أعد رفع صور السيارة من حسابك.' }
+      return { success: false, message: 'أعد رفع صور الإعلان من حسابك.' }
     }
     if (!verificationImage || !isOwnedPublicBlobUrl(verificationImage, 'verification', session.user.id)) {
       return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
@@ -107,26 +165,28 @@ export async function submitListing(draft: ListingDraft) {
       userId: session.user.id,
       make,
       model,
-      year: draft.year,
+      category,
+      details,
+      year: category === 'cars' ? draft.year : new Date().getFullYear(),
       condition: draft.condition,
-      mileage: draft.condition === 'new' || draft.mileageUnknown ? 0 : draft.mileage,
-      mileageUnknown: draft.mileageUnknown,
-      usageMonths: draft.condition === 'used' ? draft.usageMonths ?? 0 : 0,
-      maintenanceVisited: draft.maintenanceVisited,
-      maintenanceReason: draft.maintenanceVisited ? cleanText(draft.maintenanceReason, 500) || null : null,
-      repaired: draft.repaired,
-      repairDetails: draft.repaired ? cleanText(draft.repairDetails, 500) || null : null,
-      partsChanged: draft.partsChanged,
-      changedParts: draft.partsChanged ? cleanText(draft.changedParts, 500) || null : null,
+      mileage: category === 'cars' && draft.condition === 'used' && !draft.mileageUnknown ? draft.mileage : 0,
+      mileageUnknown: category === 'cars' && draft.mileageUnknown,
+      usageMonths: category === 'cars' && draft.condition === 'used' ? draft.usageMonths ?? 0 : 0,
+      maintenanceVisited: category === 'cars' && draft.maintenanceVisited,
+      maintenanceReason: category === 'cars' && draft.maintenanceVisited ? cleanText(draft.maintenanceReason, 500) || null : null,
+      repaired: category === 'cars' && draft.repaired,
+      repairDetails: category === 'cars' && draft.repaired ? cleanText(draft.repairDetails, 500) || null : null,
+      partsChanged: category === 'cars' && draft.partsChanged,
+      changedParts: category === 'cars' && draft.partsChanged ? cleanText(draft.changedParts, 500) || null : null,
       askingPrice: draft.askingPrice,
-      negotiationMin: draft.negotiationMin,
-      negotiationMax: draft.negotiationMax,
-      negotiable: draft.negotiable,
-      paintCondition: draft.paintCondition,
-      paintDetails: cleanText(draft.paintDetails, 250) || null,
-      transmission: draft.transmission,
-      fuelType: draft.fuelType,
-      registrationStatus: draft.registrationStatus,
+      negotiationMin: category === 'cars' ? draft.negotiationMin : null,
+      negotiationMax: category === 'cars' ? draft.negotiationMax : null,
+      negotiable: category === 'cars' && draft.negotiable,
+      paintCondition: category === 'cars' ? draft.paintCondition : null,
+      paintDetails: category === 'cars' ? cleanText(draft.paintDetails, 250) || null : null,
+      transmission: category === 'cars' ? draft.transmission : null,
+      fuelType: category === 'cars' ? draft.fuelType : null,
+      registrationStatus: category === 'cars' ? draft.registrationStatus : null,
       whatsappOnly: draft.whatsappOnly,
       city,
       description: description || null,
@@ -333,32 +393,37 @@ export async function resubmitRejectedListing(listingId: string, draft: ListingD
       return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
     }
     const verificationImage = uploadedVerificationImage || listing.verificationImage || undefined
-    const make = cleanText(draft.make, 50)
-    const model = cleanText(draft.model, 60)
+    const category = draft.category === undefined ? 'cars' : draft.category
+    if (!isListingCategory(category)) return { success: false, message: 'اختر قسماً صحيحاً للإعلان.' }
+    const details = sanitizeDetails(category, draft.details)
+    const make = cleanText(draft.make, 80)
+    const model = cleanText(draft.model, 120)
     const city = cleanText(draft.city, 60)
     const sellerPhone = cleanText(draft.sellerPhone, 20).replace(/[\s()-]/g, '')
     const description = cleanText(draft.description, 1200)
     const images = Array.isArray(draft.images) ? draft.images : []
     const phoneIsValid = /^\+?[1-9]\d{7,14}$/.test(sellerPhone)
-    const priceIsValid = isWholeNumber(draft.askingPrice, 1000, 100_000_000)
+    const priceIsValid = isWholeNumber(draft.askingPrice, category === 'cars' ? 1000 : 1, 100_000_000)
     const yearIsValid = isWholeNumber(draft.year, 1980, new Date().getFullYear() + 1)
     const conditionIsValid = draft.condition === 'new' || draft.condition === 'used'
     const mileageIsValid = isWholeNumber(draft.mileage, 0, 2_000_000)
     const monthsIsValid = draft.condition === 'new' || isWholeNumber(draft.usageMonths, 0, 1200)
     const booleansAreValid = typeof draft.maintenanceVisited === 'boolean' && typeof draft.repaired === 'boolean' && typeof draft.partsChanged === 'boolean'
-    const negotiationIsValid = (value: unknown) => value === null || isWholeNumber(value, 1000, 100_000_000)
+    const negotiationIsValid = (value: unknown) => value === null || isWholeNumber(value, 1, 100_000_000)
+    const categoryDetailsAreValid = areCategoryDetailsValid(category, details)
+    const vehicleDetailsAreValid = category !== 'cars' || isVehicleDetailsValid(draft)
 
-    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid || !isVehicleDetailsValid(draft)) {
-      return { success: false, message: 'راجِع بيانات السيارة والسعر ورقم التواصل.' }
+    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid || !categoryDetailsAreValid || !vehicleDetailsAreValid) {
+      return { success: false, message: 'راجِع القسم ومواصفات الإعلان والسعر ورقم التواصل.' }
     }
     if (!negotiationIsValid(draft.negotiationMin) || !negotiationIsValid(draft.negotiationMax) || images.length < 1 || images.length > 8) {
       return { success: false, message: 'أضف من صورة واحدة إلى 8 صور، وتحقق من نطاق السعر.' }
     }
-    if (draft.negotiationMin && draft.negotiationMax && draft.negotiationMin > draft.negotiationMax) {
+    if (category === 'cars' && draft.negotiationMin && draft.negotiationMax && draft.negotiationMin > draft.negotiationMax) {
       return { success: false, message: 'الحد الأدنى للتفاوض يجب أن يكون أقل من الحد الأعلى.' }
     }
     if (new Set(images).size !== images.length || images.some((url) => typeof url !== 'string' || !isOwnedPublicBlobUrl(url, 'cars', session.user.id))) {
-      return { success: false, message: 'أعد رفع صور السيارة من حسابك.' }
+      return { success: false, message: 'أعد رفع صور الإعلان من حسابك.' }
     }
     if (!verificationImage || !isOwnedPublicBlobUrl(verificationImage, 'verification', session.user.id)) {
       return { success: false, message: 'أعد رفع صورة التحقق من حسابك.' }
@@ -369,26 +434,28 @@ export async function resubmitRejectedListing(listingId: string, draft: ListingD
       .set({
         make,
         model,
-        year: draft.year,
+        category,
+        details,
+        year: category === 'cars' ? draft.year : new Date().getFullYear(),
         condition: draft.condition,
-        mileage: draft.condition === 'new' || draft.mileageUnknown ? 0 : draft.mileage,
-        mileageUnknown: draft.condition === 'used' && draft.mileageUnknown,
-        usageMonths: draft.condition === 'used' ? draft.usageMonths ?? 0 : 0,
-        maintenanceVisited: draft.maintenanceVisited,
-        maintenanceReason: draft.maintenanceVisited ? cleanText(draft.maintenanceReason, 500) || null : null,
-        repaired: draft.repaired,
-        repairDetails: draft.repaired ? cleanText(draft.repairDetails, 500) || null : null,
-        partsChanged: draft.partsChanged,
-        changedParts: draft.partsChanged ? cleanText(draft.changedParts, 500) || null : null,
+        mileage: category === 'cars' && draft.condition === 'used' && !draft.mileageUnknown ? draft.mileage : 0,
+        mileageUnknown: category === 'cars' && draft.condition === 'used' && draft.mileageUnknown,
+        usageMonths: category === 'cars' && draft.condition === 'used' ? draft.usageMonths ?? 0 : 0,
+        maintenanceVisited: category === 'cars' && draft.maintenanceVisited,
+        maintenanceReason: category === 'cars' && draft.maintenanceVisited ? cleanText(draft.maintenanceReason, 500) || null : null,
+        repaired: category === 'cars' && draft.repaired,
+        repairDetails: category === 'cars' && draft.repaired ? cleanText(draft.repairDetails, 500) || null : null,
+        partsChanged: category === 'cars' && draft.partsChanged,
+        changedParts: category === 'cars' && draft.partsChanged ? cleanText(draft.changedParts, 500) || null : null,
         askingPrice: draft.askingPrice,
-        negotiationMin: draft.negotiationMin,
-        negotiationMax: draft.negotiationMax,
-        negotiable: draft.negotiable,
-        paintCondition: draft.paintCondition,
-        paintDetails: cleanText(draft.paintDetails, 250) || null,
-        transmission: draft.transmission,
-        fuelType: draft.fuelType,
-        registrationStatus: draft.registrationStatus,
+        negotiationMin: category === 'cars' ? draft.negotiationMin : null,
+        negotiationMax: category === 'cars' ? draft.negotiationMax : null,
+        negotiable: category === 'cars' && draft.negotiable,
+        paintCondition: category === 'cars' ? draft.paintCondition : null,
+        paintDetails: category === 'cars' ? cleanText(draft.paintDetails, 250) || null : null,
+        transmission: category === 'cars' ? draft.transmission : null,
+        fuelType: category === 'cars' ? draft.fuelType : null,
+        registrationStatus: category === 'cars' ? draft.registrationStatus : null,
         whatsappOnly: draft.whatsappOnly,
         city,
         description: description || null,

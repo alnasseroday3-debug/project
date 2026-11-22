@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core'
+import type { ListingCategory, ListingDetails } from '@/lib/listing-categories'
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -81,6 +82,8 @@ export const carListings = pgTable('car_listings', {
   userId: text('userId').notNull(),
   make: text('make').notNull(),
   model: text('model').notNull(),
+  category: text('category').$type<ListingCategory>().default('cars'),
+  details: jsonb('details').$type<ListingDetails>(),
   year: integer('year').notNull(),
   condition: text('condition').notNull(),
   mileage: integer('mileage').notNull().default(0),
@@ -128,5 +131,5 @@ export const rateLimits = pgTable('rate_limits', {
 })
 
 export type CarListing = typeof carListings.$inferSelect
-export type PublicCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'mileage' | 'mileageUnknown' | 'askingPrice' | 'negotiable' | 'city' | 'images' | 'verified'>
-export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'askingPrice' | 'status' | 'images' | 'rejectionReason' | 'expiresAt' | 'directRenewals' | 'archivedByAdmin' | 'archivedByExpiry' | 'hiddenByOwner' | 'publishedAt' | 'createdAt'>
+export type PublicCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'category' | 'details' | 'year' | 'condition' | 'mileage' | 'mileageUnknown' | 'askingPrice' | 'negotiable' | 'city' | 'images' | 'verified'>
+export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'category' | 'details' | 'year' | 'condition' | 'city' | 'askingPrice' | 'status' | 'images' | 'rejectionReason' | 'expiresAt' | 'directRenewals' | 'archivedByAdmin' | 'archivedByExpiry' | 'hiddenByOwner' | 'publishedAt' | 'createdAt'>

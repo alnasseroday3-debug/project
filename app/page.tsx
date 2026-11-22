@@ -1,16 +1,24 @@
 import { and, desc, eq, gt } from 'drizzle-orm'
+import type { Metadata } from 'next'
 import { HomePage } from '@/components/marketplace/home-page'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
 
 export const dynamic = 'force-dynamic'
 
+export const metadata: Metadata = {
+  title: { absolute: 'مَسَار | سوق سوريا الشامل' },
+  description: 'تصفّح السيارات والعقارات والأثاث والأدوات الكهربائية والإلكترونيات والملابس في سوق سوريا الشامل من مَسَار.',
+}
+
 export default async function Page() {
-  const cars = await db
+  const listings = await db
     .select({
       id: carListings.id,
       make: carListings.make,
       model: carListings.model,
+      category: carListings.category,
+      details: carListings.details,
       year: carListings.year,
       condition: carListings.condition,
       mileage: carListings.mileage,
@@ -29,6 +37,8 @@ export default async function Page() {
     .from(carListings)
     .where(and(eq(carListings.status, 'approved'), gt(carListings.expiresAt, new Date())))
     .orderBy(desc(carListings.publishedAt))
+    .limit(13)
 
-  return <HomePage cars={cars} />
+  const hasMore = listings.length > 12
+  return <HomePage initialPage={{ items: hasMore ? listings.slice(0, 12) : listings, hasMore, pageSize: 12, offset: 0 }} />
 }

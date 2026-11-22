@@ -9,6 +9,7 @@ import { CarPhoto } from '@/components/marketplace/car-photo'
 import { SupportInbox } from '@/components/marketplace/support-inbox'
 import { carImageUrl } from '@/lib/car-image-url'
 import type { AdminSupportTicket, CarListing } from '@/lib/db/schema'
+import { listingCategoryLabels } from '@/lib/listing-categories'
 
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 type AdminSection = 'pending' | 'published' | 'archived' | 'support'
@@ -21,24 +22,44 @@ function whatsappUrl(phone: string, make: string, model: string, year: number) {
   return `https://wa.me/${number}?text=${message}`
 }
 
+function AdminCategoryFacts({ car }: { car: CarListing }) {
+  const category = car.category ?? 'cars'
+  const details = car.details ?? {}
+  if (category === 'cars') return null
+  const selected = (field: string, otherField: string) => details[field] === 'other' ? details[otherField] ?? '' : details[field] ?? ''
+  const type = category === 'real_estate' ? selected('propertyType', 'propertyTypeOther') : selected('itemType', 'itemTypeOther')
+  const facts = category === 'real_estate'
+    ? [['نوع العقار', type], ['المساحة', details.areaSqm ? `${details.areaSqm} م²` : ''], ['الغرف', details.rooms], ['الطابق', details.floor], ['الحالة', details.condition || details.propertyCondition], ['الملكية', selected('ownershipType', 'ownershipOther')]]
+    : category === 'furniture'
+      ? [['نوع الأثاث', type], ['الحالة', details.condition]]
+      : category === 'appliances'
+        ? [['نوع الأداة', type], ['الماركة', details.brand], ['الحالة', details.condition]]
+        : category === 'electronics'
+          ? [['نوع الجهاز', type], ['السعة والمواصفات', details.specifications], ['الحالة', details.condition]]
+          : [['النوع', type], ['صفة البائع', details.sellerType], ['المقاسات', details.size], ['الحالة', details.condition]]
+  return <div className="admin-market-details" aria-label={`مواصفات ${listingCategoryLabels[category]}`}>{facts.filter(([, value]) => value).map(([label, value]) => <span key={label}><strong>{label}:</strong> {value}</span>)}</div>
+}
+
 function AdminEmpty({ title, description }: { title: string; description: string }) {
   return <section className="admin-empty"><span><Check aria-hidden="true" /></span><h2>{title}</h2><p>{description}</p></section>
 }
 
 function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onReturnToPending, onReject, onDelete }: { car: CarListing; archived: boolean; disabled: boolean; onArchive: (car: CarListing) => void; onRepublish: (car: CarListing) => void; onReturnToPending: (car: CarListing) => void; onReject: (car: CarListing) => void; onDelete: (car: CarListing, archived: boolean) => void }) {
+  const category = car.category ?? 'cars'
+  const isCar = category === 'cars'
   const isSellerArchived = archived && !car.archivedByAdmin && !car.archivedByExpiry
   const photos = car.images.map((image) => image.startsWith('http') || image.startsWith('/')
     ? image
     : `/api/car-images?listing=${encodeURIComponent(car.id)}&path=${encodeURIComponent(image)}`)
   return (
     <article className="admin-card admin-record-card">
-      <div className="admin-card-photo"><CarPhoto src={photos[0] || carImageUrl(car)} alt={`${car.make} ${car.model} ${car.year}`} width={520} height={360} /></div>
+      <div className="admin-card-photo"><CarPhoto src={photos[0] || carImageUrl(car)} alt={`${car.make} ${car.model}`} width={520} height={360} /></div>
       <div className="admin-card-info">
-        <div className="admin-card-title"><div><span className="listing-make">{car.make}</span><h2>{car.model} <small>{car.year}</small></h2></div><span className={`pending-pill ${archived ? 'is-archived' : 'is-published'}`}>{archived ? <Archive aria-hidden="true" /> : <BadgeCheck aria-hidden="true" />}{archived ? 'ضمن الأرشيف' : 'منشور حالياً'}</span></div>
+        <div className="admin-card-title"><div><span className="listing-make">{isCar ? car.make : listingCategoryLabels[category]}</span><h2>{isCar ? car.model : car.make} {isCar && <small>{car.year}</small>}</h2>{!isCar && car.model && <small>{car.model}</small>}</div><span className={`pending-pill ${archived ? 'is-archived' : 'is-published'}`}>{archived ? <Archive aria-hidden="true" /> : <BadgeCheck aria-hidden="true" />}{archived ? 'ضمن الأرشيف' : 'منشور حالياً'}</span></div>
         {archived && <span className={`archive-source-badge${isSellerArchived ? ' is-seller-archive' : ''}`}>{isSellerArchived ? 'حُذف بواسطة البائع (تم البيع / أزاله صاحبه)' : car.archivedByAdmin ? 'مؤرشف إدارياً' : 'انتهت مدة العرض'}</span>}
-        <p className="admin-description">{car.description || 'لا توجد نبذة عن السيارة.'}</p>
-        <div className="admin-facts"><span dir="ltr">${money.format(car.askingPrice)} USD</span><span>{money.format(car.mileage)} كم</span><span><MapPin aria-hidden="true" /> {car.city || 'سوريا'}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName || 'معلن مَسَار'}</span>{car.sellerPhone && <a href={`tel:${car.sellerPhone}`} dir="ltr">{car.sellerPhone}</a>}</div>
-        <dl className="admin-record-details">
+        <p className="admin-description">{car.description || 'لا توجد نبذة عن الإعلان.'}</p>
+        <div className="admin-facts"><span dir="ltr">${money.format(car.askingPrice)} USD</span>{isCar && <span>{money.format(car.mileage)} كم</span>}<span><MapPin aria-hidden="true" /> {car.city || 'سوريا'}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName || 'معلن مَسَار'}</span>{car.sellerPhone && <a href={`tel:${car.sellerPhone}`} dir="ltr">{car.sellerPhone}</a>}</div>
+        {isCar ? <dl className="admin-record-details">
           <div><dt>الحالة</dt><dd>{car.condition === 'new' ? 'جديدة' : 'مستعملة'}</dd></div>
           <div><dt>مدة الاستخدام</dt><dd>{car.condition === 'new' ? 'جديدة' : `${car.usageMonths ?? 0} شهر`}</dd></div>
           <div><dt>زيارات الصيانة</dt><dd>{car.maintenanceVisited ? `نعم${car.maintenanceReason ? ` — ${car.maintenanceReason}` : ''}` : 'لا'}</dd></div>
@@ -46,7 +67,7 @@ function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onRe
           <div><dt>تغيير قطع أساسية</dt><dd>{car.partsChanged ? `نعم${car.changedParts ? ` — ${car.changedParts}` : ''}` : 'لا'}</dd></div>
           <div><dt>حالة التوثيق</dt><dd>{car.verified ? 'موثق من مَسَار' : 'غير موثق'}</dd></div>
           <div><dt>معرّف الإعلان</dt><dd dir="ltr">{car.id}</dd></div>
-        </dl>
+        </dl> : <AdminCategoryFacts car={car} />}
         {photos.length > 1 && <div className="admin-record-gallery" aria-label="صور الإعلان">{photos.slice(1).map((src, index) => <CarPhoto key={`${car.id}-photo-${index}`} src={src} alt={`صورة ${index + 2} لإعلان ${car.make} ${car.model}`} width={180} height={120} />)}</div>}
         {car.verificationImage && <section className="admin-verification" aria-label="صورة التحقق الخاصة بالإدارة"><Image className="admin-verification-image" src={`/api/verification-image?listing=${encodeURIComponent(car.id)}`} alt={`صورة التحقق الخاصة بإعلان ${car.make} ${car.model}`} width={520} height={360} unoptimized /><div className="admin-verification-content"><strong>صورة التحقق وإثبات الجدية</strong><span>مرئية للإدارة فقط ولا تُنشر مع الإعلان.</span>{car.sellerPhone && <a className="admin-whatsapp" href={whatsappUrl(car.sellerPhone, car.make, car.model, car.year)} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden="true" /> مراسلة البائع عبر واتساب</a>}</div></section>}
         <div className="admin-record-actions">{archived ? isSellerArchived ? <button type="button" className="admin-permanent-delete" disabled={disabled} onClick={() => onDelete(car, true)}><Trash2 aria-hidden="true" />حذف نهائي من الأرشيف</button> : <>
@@ -228,10 +249,10 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
           {activeSection === 'pending' ? visiblePending.map((car) => <article className="admin-card" key={car.id}>
             <div className="admin-card-photo"><CarPhoto src={carImageUrl(car)} alt={`${car.make} ${car.model}`} width={520} height={360} /></div>
             <div className="admin-card-info">
-              <div className="admin-card-title"><div><span className="listing-make">{car.make}</span><h2>{car.model} <small>{car.year}</small></h2></div><span className="pending-pill"><Clock3 aria-hidden="true" /> قيد المراجعة</span></div>
-              <p className="admin-description">{car.description || 'لا توجد نبذة عن السيارة.'}</p>
-              <div className="admin-facts"><span dir="ltr">${money.format(car.askingPrice)} USD</span><span>{car.mileageUnknown ? 'العداد متوقف / لا أعلم' : `${money.format(car.mileage)} كم`}</span><span><MapPin aria-hidden="true" /> {car.city}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName}</span></div>
-              <div className="admin-market-details"><span><strong>الدهان:</strong> {car.paintCondition === 'clean' ? 'خالية العلام جوا وبرا' : car.paintCondition === 'interior' ? 'خالية من الداخل — زنار' : car.paintCondition === 'panels' ? 'بخ قطعتين أو ثلاث' : 'غير محدد'}{car.paintDetails ? ` — ${car.paintDetails}` : ''}</span><span><strong>الفيتيس:</strong> {car.transmission === 'automatic' ? 'أوتوماتيك' : car.transmission === 'manual' ? 'عادي' : 'غير محدد'}</span><span><strong>الوقود:</strong> {car.fuelType === 'gasoline' ? 'بنزين' : car.fuelType === 'diesel' ? 'مازوت' : car.fuelType === 'hybrid' ? 'هايبرد' : car.fuelType === 'electric' ? 'كهرباء' : 'غير محدد'}</span><span><strong>الأوراق:</strong> {car.registrationStatus === 'syrian' ? 'نمرة سورية نظامية' : car.registrationStatus === 'new-entry' ? 'إدخال جديد' : car.registrationStatus === 'customs-cleared' ? 'مجمركة' : car.registrationStatus === 'immediate-transfer' ? 'فراغ فوري' : 'غير محددة'}</span><span><strong>السعر:</strong> {car.negotiable ? 'قابل للتفاوض' : 'غير قابل للتفاوض'}</span><span><strong>التواصل:</strong> {car.whatsappOnly ? 'واتساب فقط' : 'واتساب أو اتصال'}</span></div>
+              <div className="admin-card-title"><div><span className="listing-make">{(car.category ?? 'cars') === 'cars' ? car.make : listingCategoryLabels[car.category ?? 'cars']}</span><h2>{(car.category ?? 'cars') === 'cars' ? car.model : car.make} {(car.category ?? 'cars') === 'cars' && <small>{car.year}</small>}</h2>{(car.category ?? 'cars') !== 'cars' && car.model && <small>{car.model}</small>}</div><span className="pending-pill"><Clock3 aria-hidden="true" /> قيد المراجعة</span></div>
+              <p className="admin-description">{car.description || 'لا توجد نبذة عن الإعلان.'}</p>
+              <div className="admin-facts"><span dir="ltr">${money.format(car.askingPrice)} USD</span>{(car.category ?? 'cars') === 'cars' && <span>{car.mileageUnknown ? 'العداد متوقف / لا أعلم' : `${money.format(car.mileage)} كم`}</span>}<span><MapPin aria-hidden="true" /> {car.city}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName}</span></div>
+              {(car.category ?? 'cars') === 'cars' ? <div className="admin-market-details"><span><strong>الدهان:</strong> {car.paintCondition === 'clean' ? 'خالية العلام جوا وبرا' : car.paintCondition === 'interior' ? 'خالية من الداخل — زنار' : car.paintCondition === 'panels' ? 'بخ قطعتين أو ثلاث' : 'غير محدد'}{car.paintDetails ? ` — ${car.paintDetails}` : ''}</span><span><strong>الفيتيس:</strong> {car.transmission === 'automatic' ? 'أوتوماتيك' : car.transmission === 'manual' ? 'عادي' : 'غير محدد'}</span><span><strong>الوقود:</strong> {car.fuelType === 'gasoline' ? 'بنزين' : car.fuelType === 'diesel' ? 'مازوت' : car.fuelType === 'hybrid' ? 'هايبرد' : car.fuelType === 'electric' ? 'كهرباء' : 'غير محدد'}</span><span><strong>الأوراق:</strong> {car.registrationStatus === 'syrian' ? 'نمرة سورية نظامية' : car.registrationStatus === 'new-entry' ? 'إدخال جديد' : car.registrationStatus === 'customs-cleared' ? 'مجمركة' : car.registrationStatus === 'immediate-transfer' ? 'فراغ فوري' : 'غير محددة'}</span><span><strong>السعر:</strong> {car.negotiable ? 'قابل للتفاوض' : 'غير قابل للتفاوض'}</span><span><strong>التواصل:</strong> {car.whatsappOnly ? 'واتساب فقط' : 'واتساب أو اتصال'}</span></div> : <AdminCategoryFacts car={car} />}
               <section className="admin-verification" aria-label="صورة التحقق الخاصة بالإدارة">
                 {car.verificationImage ? <Image className="admin-verification-image" src={`/api/verification-image?listing=${encodeURIComponent(car.id)}`} alt={`صورة التحقق الخاصة بإعلان ${car.make} ${car.model}`} width={520} height={360} unoptimized /> : <div className="admin-verification-missing">لم تُرفق صورة تحقق لهذا الإعلان.</div>}
                 <div className="admin-verification-content"><strong>صورة التحقق وإثبات الجدية</strong><span>مرئية للإدارة فقط ولا تُنشر مع الإعلان.</span>{car.sellerPhone && <a className="admin-whatsapp" href={whatsappUrl(car.sellerPhone, car.make, car.model, car.year)} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden="true" /> مراسلة البائع عبر واتساب للتحقق</a>}</div>
@@ -239,7 +260,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
               <div className="admin-review-actions"><Link className="review-details" href={`/cars/${car.id}`} target="_blank" rel="noreferrer">تفاصيل الإعلان <ArrowUpLeft aria-hidden="true" /></Link><label className="admin-verified-toggle"><input type="checkbox" checked={verifiedSelections[car.id] ?? false} disabled={isPending || isMutating} onChange={(event) => setVerifiedSelections((current) => ({ ...current, [car.id]: event.target.checked }))} /><span>منح شارة إعلان موثق من إدارة مَسَار</span></label><button type="button" className="review-reject" disabled={isPending || isMutating} onClick={() => openRejectDialog(car.id)}><X aria-hidden="true" /> رفض مع توضيح السبب</button><button type="button" className="review-archive" disabled={isPending || isMutating} onClick={() => archivePendingListing(car)}><Archive aria-hidden="true" /> حذف وأرشفة</button><button type="button" className="review-approve" disabled={isPending || isMutating || !car.verificationImage} title={!car.verificationImage ? 'لا يمكن الموافقة دون صورة تحقق' : undefined} onClick={() => review(car.id, 'approved')}><Check aria-hidden="true" />{activeId === car.id ? 'جارٍ التحديث…' : 'موافقة ونشر'}</button></div>
             </div>
           </article>) : selectedListings.map((car) => <AdminRecordCard key={car.id} car={car} archived={activeSection === 'archived'} disabled={isMutating} onArchive={(item) => updateListingStatus(item, 'archive')} onRepublish={(item) => updateListingStatus(item, 'republish')} onReturnToPending={(item) => updateListingStatus(item, 'restore-pending')} onReject={(item) => openRejectDialog(item.id, 'archived')} onDelete={(item, archived) => setDeleteTarget({ car: item, archived })} />)}
-        </div> : <AdminEmpty title={activeSection === 'pending' ? 'لا توجد طلبات معلقة' : activeSection === 'published' ? 'لا توجد إعلانات منشورة' : 'الأرشيف فارغ حالياً'} description={activeSection === 'pending' ? 'لا توجد إعلانات تنتظر المراجعة حالياً.' : activeSection === 'published' ? 'ستظهر هنا السيارات المنشورة في السوق.' : 'الإعلانات التي يزيلها أصحابها من العرض ستُحفظ هنا للإدارة.'} />}
+        </div> : <AdminEmpty title={activeSection === 'pending' ? 'لا توجد طلبات معلقة' : activeSection === 'published' ? 'لا توجد إعلانات منشورة' : 'الأرشيف فارغ حالياً'} description={activeSection === 'pending' ? 'لا توجد إعلانات تنتظر المراجعة حالياً.' : activeSection === 'published' ? 'ستظهر هنا الإعلانات المنشورة في السوق.' : 'الإعلانات التي يزيلها أصحابها من العرض ستُحفظ هنا للإدارة.'} />}
       </main>
       <dialog ref={deleteDialogRef} className="listing-action-dialog" aria-labelledby="admin-delete-title" onCancel={() => setDeleteTarget(null)} onClose={() => { if (deleteTarget) setDeleteTarget(null) }}>
         {deleteTarget && <div className="listing-action-form">
