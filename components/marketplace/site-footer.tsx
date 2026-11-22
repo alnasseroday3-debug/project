@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { AtSign, Store } from 'lucide-react'
 import { PwaInstallButton } from '@/components/marketplace/pwa-install-button'
+import { SupportContact } from '@/components/marketplace/support-contact'
 
 export function SiteFooter({ isAdmin }: { isAdmin: boolean }) {
   return (
@@ -30,6 +31,7 @@ export function SiteFooter({ isAdmin }: { isAdmin: boolean }) {
         <span>© 2026 مَسَار. جميع الحقوق محفوظة.</span>
         <span>سوقٌ يقرّبك مما تبحث عنه.</span>
       </div>
+      <div className="footer-support-row"><SupportContact /></div>
     </footer>
   )
 }

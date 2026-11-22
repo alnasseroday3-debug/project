@@ -1,9 +1,10 @@
 import { Analytics } from '@vercel/analytics/next'
 import { and, count, eq, ne, or } from 'drizzle-orm'
 import type { Metadata, Viewport } from 'next'
+import { GuestWelcome } from '@/components/marketplace/guest-welcome'
 import { SiteFooter } from '@/components/marketplace/site-footer'
 import { SiteHeader } from '@/components/marketplace/site-header'
-import { SupportContact } from '@/components/marketplace/support-contact'
+import { ThemePreferenceInitializer } from '@/components/marketplace/theme-preference'
 import { getCurrentSession, isAdminEmail } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
@@ -90,12 +91,13 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" data-theme="dark" suppressHydrationWarning>
       <body className="antialiased">
+        <ThemePreferenceInitializer />
         <SiteHeader isAdmin={isAdmin} pendingCount={pendingCount} myListingsCount={myListingsCount} sessionUser={session?.user ?? null} />
         {children}
         <SiteFooter isAdmin={isAdmin} />
-        <SupportContact />
+        <GuestWelcome isAuthenticated={Boolean(session?.user)} />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

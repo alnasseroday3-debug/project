@@ -1,9 +1,11 @@
-import { CarPhoto } from '@/components/marketplace/car-photo'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { eq } from 'drizzle-orm'
 import { ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, CircleX, Gauge, House, MapPin, Phone, Ruler, ShieldCheck, Smartphone, Store, Tag, Wrench } from 'lucide-react'
 import { ShareListingButton } from '@/components/marketplace/share-listing-button'
+import { ListingGallery } from '@/components/marketplace/listing-gallery'
+import { ListingDetailActions } from '@/components/marketplace/listing-detail-actions'
+import { getCurrentSession, isAdminEmail } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
 import { listingCategoryLabels, type ListingCategory, type ListingDetails } from '@/lib/listing-categories'
@@ -65,6 +67,7 @@ export default async function CarPage({ params }: CarPageProps) {
   const { id } = await params
   const [car] = await db.select({
     id: carListings.id,
+    userId: carListings.userId,
     make: carListings.make,
     model: carListings.model,
     category: carListings.category,
@@ -121,46 +124,67 @@ export default async function CarPage({ params }: CarPageProps) {
     ? `مرحباً، شفت إعلان سيارتك (${car.make} ${car.model}، سنة الصنع ${car.year}) المعروضة على منصة مَسَار بسعر ${money.format(car.askingPrice)} دولار وحابب استفسر عنها.`
     : `مرحباً، شفت إعلان ${itemTitle} على منصة مَسَار بسعر ${money.format(car.askingPrice)} دولار وحابب استفسر عنه.`)
   const phone = car.sellerPhone?.replace(/[^\d+]/g, '')
+  const session = await getCurrentSession()
+  const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified, session.user.role))
+  const canDelete = Boolean(session?.user && (session.user.id === car.userId || isAdmin))
+  const itemType = isCar
+    ? 'سيارة'
+    : selectedDetail(details, 'propertyType', 'propertyTypeOther') || selectedDetail(details, 'itemType', 'itemTypeOther') || listingCategoryLabels[category]
+  const vehicleSpecs = [
+    { label: 'القسم', value: listingCategoryLabels.cars },
+    { label: 'الحالة', value: car.condition === 'new' ? 'جديدة' : 'مستعملة' },
+    { label: 'سنة الصنع', value: String(car.year) },
+    { label: 'الممشى', value: car.mileageUnknown ? 'العداد متوقف / لا أعلم' : `${money.format(car.mileage)} كم` },
+    { label: 'مدة الاستخدام', value: car.condition === 'new' ? 'جديدة' : `${car.usageMonths ?? 0} شهر` },
+    { label: 'حالة الدهان', value: car.paintCondition === 'clean' ? 'خالية العلام جوا وبرا' : car.paintCondition === 'interior' ? 'خالية من الداخل — زنار' : car.paintCondition === 'panels' ? 'بخ قطعتين أو ثلاث' : '' },
+    { label: 'تفاصيل الدهان', value: car.paintDetails ?? '' },
+    { label: 'نوع الغيار', value: car.transmission === 'automatic' ? 'أوتوماتيك' : car.transmission === 'manual' ? 'عادي' : '' },
+    { label: 'نوع الوقود', value: car.fuelType === 'gasoline' ? 'بنزين' : car.fuelType === 'diesel' ? 'مازوت' : car.fuelType === 'hybrid' ? 'هايبرد' : car.fuelType === 'electric' ? 'كهرباء' : '' },
+    { label: 'حالة الأوراق والنمرة', value: car.registrationStatus === 'syrian' ? 'نمرة سورية نظامية' : car.registrationStatus === 'new-entry' ? 'إدخال جديد' : car.registrationStatus === 'customs-cleared' ? 'مجمركة' : car.registrationStatus === 'immediate-transfer' ? 'فراغ فوري' : '' },
+    { label: 'الموقع', value: [car.city, details.district].filter(Boolean).join('، ') || 'سوريا' },
+  ]
+  const detailItems = (isCar
+    ? [...vehicleSpecs, ...specs]
+    : [
+        { label: 'القسم', value: listingCategoryLabels[category] },
+        { label: 'النوع', value: itemType },
+        { label: 'الموقع', value: [car.city, details.district].filter(Boolean).join('، ') || 'سوريا' },
+        ...specs,
+      ]).filter((item, index, all) => item.value && all.findIndex((candidate) => candidate.label === item.label) === index)
 
   return (
     <main className="detail-page page-container">
-      <div className="detail-breadcrumb"><Link href="/">{listingCategoryLabels[category]}</Link><span>/</span><span>{itemTitle}</span></div>
+      <div className="detail-breadcrumb"><Link href="/">السوق</Link><span>/</span><span>{itemTitle}</span></div>
       <div className="detail-layout">
-        <section className="detail-main">
-          <div className="detail-photo-wrap">
-            {images.length ? <CarPhoto src={images[0]} alt={itemTitle || 'صورة الإعلان'} width={1200} height={780} className="detail-photo" /> : <div className="detail-photo-fallback" />}
-            {(isCar ? (car.condition === 'new' ? 'جديدة' : 'مستعملة') : details.condition) && <span className="condition-badge detail-condition">{isCar ? (car.condition === 'new' ? 'جديدة' : 'مستعملة') : details.condition}</span>}
-          </div>
-          <div className="detail-title-block">
-            <div><span className="listing-make">{isCar ? car.make : listingCategoryLabels[category]}</span><h1>{isCar ? car.model : car.make}</h1>{car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار</span>}</div>
+        <section className="detail-content-column">
+          <header className="detail-title-block">
+            <div>
+              <span className="detail-category-label">{listingCategoryLabels[category]}</span>
+              <span className="detail-type-label">{itemType}</span>
+              <h1>{itemTitle || itemType}</h1>
+              {car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار</span>}
+            </div>
             {isCar && <span className="detail-year">{car.year}</span>}
-          </div>
-          <div className="detail-specs">
-            {isCar ? <>
-              <div><Gauge aria-hidden="true" /><span>الممشى</span><strong>{car.mileageUnknown ? 'العداد متوقف / لا أعلم' : `${money.format(car.mileage)} كم`}</strong></div>
-              <div><MapPin aria-hidden="true" /><span>الموقع</span><strong>{car.city || 'سوريا'}</strong></div>
-              <div><CalendarDays aria-hidden="true" /><span>مدة الاستخدام</span><strong>{car.condition === 'new' ? 'جديدة' : `${car.usageMonths ?? 0} شهر`}</strong></div>
-            </> : <>
-              <div><MapPin aria-hidden="true" /><span>الموقع</span><strong>{[car.city, details.district].filter(Boolean).join('، ') || 'سوريا'}</strong></div>
-              {details.condition && <div><BadgeCheck aria-hidden="true" /><span>الحالة</span><strong>{details.condition}</strong></div>}
-            </>}
-          </div>
-          {isCar ? <section className="detail-section detail-market-section" aria-label="مواصفات السيارة">
-            <h2>مواصفات السوق</h2>
-            <dl className="detail-market-grid">
-              <div><dt>حالة البخ (الدهان)</dt><dd>{car.paintCondition === 'clean' ? 'خالية العلام جوا وبرا' : car.paintCondition === 'interior' ? 'خالية من الداخل — زنار' : car.paintCondition === 'panels' ? 'بخ قطعتين أو ثلاث' : 'غير محددة'}</dd>{car.paintDetails && <small>{car.paintDetails}</small>}</div>
-              <div><dt>نوع الغيار</dt><dd>{car.transmission === 'automatic' ? 'أوتوماتيك' : car.transmission === 'manual' ? 'عادي' : 'غير محدد'}</dd></div>
-              <div><dt>نوع الوقود</dt><dd>{car.fuelType === 'gasoline' ? 'بنزين' : car.fuelType === 'diesel' ? 'مازوت' : car.fuelType === 'hybrid' ? 'هايبرد' : car.fuelType === 'electric' ? 'كهرباء' : 'غير محدد'}</dd></div>
-              <div><dt>حالة الأوراق والنمرة</dt><dd>{car.registrationStatus === 'syrian' ? 'نمرة سورية نظامية' : car.registrationStatus === 'new-entry' ? 'إدخال جديد' : car.registrationStatus === 'customs-cleared' ? 'مجمركة' : car.registrationStatus === 'immediate-transfer' ? 'فراغ فوري' : 'غير محددة'}</dd></div>
-            </dl>
-          </section> : specs.length > 0 && <section className="detail-section detail-category-section" aria-label={`مواصفات ${listingCategoryLabels[category]}`}>
-            <h2>مواصفات الإعلان</h2>
-            <dl className="detail-category-grid">{specs.map((spec) => <div className="detail-category-spec" key={spec.label}><dt><span>{spec.icon}</span>{spec.label}</dt><dd>{spec.value}</dd></div>)}</dl>
-          </section>}
-          <section className="detail-section">
+          </header>
+
+          <section className="detail-price-panel" aria-label="السعر والتواصل">
+            <div><span className="eyebrow eyebrow-green">السعر المطلوب</span><p className="detail-price" dir="ltr"><strong>${money.format(car.askingPrice)}</strong></p></div>
+            {(car.negotiable || car.negotiationMin || car.negotiationMax) && <p className="negotiation-note">قابل للتفاوض <span dir="ltr">{car.negotiationMin ? `$${money.format(car.negotiationMin)}` : ''}{car.negotiationMin && car.negotiationMax ? ' — ' : ''}{car.negotiationMax ? `$${money.format(car.negotiationMax)}` : ''}</span></p>}
+          </section>
+
+          <section className="detail-section detail-bullet-section" aria-labelledby="detail-specs-title">
+            <h2 id="detail-specs-title">تفاصيل الإعلان</h2>
+            <ul className="detail-bullet-list">
+              {detailItems.map((item) => <li key={item.label}><strong>{item.label}</strong><span>{item.value}</span></li>)}
+              {car.whatsappOnly && <li><strong>طريقة التواصل</strong><span>واتساب فقط</span></li>}
+            </ul>
+          </section>
+
+          <section className="detail-section detail-description-section">
             <h2>{isCar ? 'عن السيارة' : 'عن الإعلان'}</h2>
             <p>{car.description || 'تفاصيل الإعلان متوفرة مباشرة من المعلن.'}</p>
           </section>
+
           {isCar && <section className="detail-section condition-report">
             <div className="inspection-heading"><div><span className="eyebrow eyebrow-green">شفافية من البائع</span><h2>الفحص الفني</h2></div><span className="inspection-caption">إجابات موثّقة في الإعلان</span></div>
             <div className="inspection-grid">
@@ -169,20 +193,22 @@ export default async function CarPage({ params }: CarPageProps) {
               <InspectionCard icon={<Wrench aria-hidden="true" />} title="تغيير قطع أساسية" answer={car.partsChanged} details={car.changedParts} />
             </div>
           </section>}
+
+          <div className="seller-card"><span className="seller-avatar">{car.sellerName?.slice(0, 1) || 'م'}</span><div><span>المعلن</span><strong>{car.sellerName || 'معلن مَسَار'}</strong>{car.verified && <span className="seller-verified">موثق من مَسَار ✓</span>}</div>{car.verified && <BadgeCheck aria-label="إعلان موثق من مَسَار" />}</div>
         </section>
 
-        <aside className="detail-aside">
-          <div className="price-card">
-            <span className="eyebrow eyebrow-green">السعر المطلوب</span>
-            <p className="detail-price" dir="ltr"><strong>${money.format(car.askingPrice)}</strong></p>
-            {(car.negotiable || car.negotiationMin || car.negotiationMax) && <p className="negotiation-note">قابل للتفاوض <span dir="ltr">{car.negotiationMin ? `$${money.format(car.negotiationMin)}` : ''}{car.negotiationMin && car.negotiationMax ? ' — ' : ''}{car.negotiationMax ? `$${money.format(car.negotiationMax)}` : ''}</span></p>}
-            <ShareListingButton />
-            {whatsappNumber ? <a className="whatsapp-button" href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer"><Phone aria-hidden="true" /> تواصل عبر واتساب</a> : <button className="whatsapp-button" type="button" disabled><Phone aria-hidden="true" /> رقم التواصل غير متوفر</button>}
+        <aside className="detail-media-column" aria-label="صور الإعلان والتواصل">
+          <div className="detail-photo-wrap">
+            <ListingGallery images={images} title={itemTitle || itemType} />
+            {(isCar ? (car.condition === 'new' ? 'جديدة' : 'مستعملة') : details.condition) && <span className="condition-badge detail-condition">{isCar ? (car.condition === 'new' ? 'جديدة' : 'مستعملة') : details.condition}</span>}
+          </div>
+          <div className="detail-contact-stack">
+            {whatsappNumber ? <a className="whatsapp-button" href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer"><Phone aria-hidden="true" /> تواصل واتساب</a> : <button className="whatsapp-button" type="button" disabled><Phone aria-hidden="true" /> رقم التواصل غير متوفر</button>}
             {phone && !car.whatsappOnly && <a className="phone-button" href={`tel:${phone}`}><Phone aria-hidden="true" /> اتصال هاتفي</a>}
-            {car.whatsappOnly && <p className="whatsapp-only-note">التواصل عبر واتساب فقط</p>}
+            <ShareListingButton />
+            {canDelete && <ListingDetailActions listingId={car.id} isAdmin={isAdmin} />}
             <p className="secure-note"><BadgeCheck aria-hidden="true" /> الإعلان تمت مراجعته من فريق مَسَار</p>
           </div>
-          <div className="seller-card"><span className="seller-avatar">{car.sellerName?.slice(0, 1) || 'م'}</span><div><span>المعلن</span><strong>{car.sellerName || 'معلن مَسَار'}</strong>{car.verified && <span className="seller-verified">موثق من مَسَار ✓</span>}</div>{car.verified && <BadgeCheck aria-label="إعلان موثق من مَسَار" />}</div>
           <Link className="back-link" href="/">العودة إلى السوق <ArrowRight aria-hidden="true" /></Link>
         </aside>
       </div>

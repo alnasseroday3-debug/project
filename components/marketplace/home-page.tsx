@@ -19,15 +19,16 @@ import {
   ShieldCheck,
   Shirt,
   Smartphone,
-  Sparkles,
   Tag,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CarPhoto } from '@/components/marketplace/car-photo'
+import { CategoryGrid } from '@/components/marketplace/category-grid'
 import type { PublicCarListing } from '@/lib/db/schema'
 import { carImageUrl } from '@/lib/car-image-url'
 import { listingAgeLabel } from '@/lib/listing-age'
 import { listingCategoryLabels, type ListingCategory } from '@/lib/listing-categories'
+import { syrianGovernorates } from '@/lib/user-preferences'
 
 type HomeListing = PublicCarListing & {
   negotiationMin: number | null
@@ -40,7 +41,6 @@ type HomeListing = PublicCarListing & {
 type ListingsPage = { items: HomeListing[]; hasMore: boolean; pageSize: number; offset: number }
 
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
-const syrianGovernorates = ['دمشق', 'ريف دمشق', 'حلب', 'حمص', 'اللاذقية', 'طرطوس', 'حماة', 'إدلب', 'درعا', 'السويداء', 'دير الزور', 'الحسكة', 'الرقة', 'القنيطرة']
 const brands = [
   { label: 'كيا', value: 'kia' }, { label: 'هيونداي', value: 'hyundai' },
   { label: 'تويوتا', value: 'toyota' }, { label: 'مرسيدس', value: 'mercedes' },
@@ -56,16 +56,6 @@ const categoryIcons: Record<ListingCategory, LucideIcon> = {
   electronics: Smartphone,
   fashion: Shirt,
 }
-const categoryValues: { id: 'all' | ListingCategory; label: string }[] = [
-  { id: 'all', label: 'الكل' },
-  { id: 'cars', label: 'السيارات والمركبات' },
-  { id: 'real_estate', label: 'العقارات والمنازل' },
-  { id: 'furniture', label: 'الأثاث المنزلي' },
-  { id: 'appliances', label: 'الأدوات الكهربائية' },
-  { id: 'electronics', label: 'الأجهزة الإلكترونية' },
-  { id: 'fashion', label: 'الملابس والأحذية' },
-]
-
 async function fetchListings(url: string): Promise<ListingsPage> {
   const response = await fetch(url)
   if (!response.ok) throw new Error('تعذّر تحميل الإعلانات.')
@@ -116,8 +106,8 @@ function ListingCard({ listing }: { listing: HomeListing }) {
         </div>
         <div className="listing-price-row">
           <p className="listing-price" dir="ltr"><strong>${money.format(listing.askingPrice)}</strong></p>
-          <Link className="text-link" href={`/cars/${listing.id}`} aria-label={`تفاصيل ${title}`}><ArrowLeft aria-hidden="true" /></Link>
         </div>
+        <Link className="listing-details-button" href={`/cars/${listing.id}`} aria-label={`عرض تفاصيل ${title}`}>عرض التفاصيل <ArrowLeft aria-hidden="true" /></Link>
       </div>
     </article>
   )
@@ -157,17 +147,27 @@ export function HomePage({ initialPage }: { initialPage: ListingsPage }) {
   const hasMore = data?.[data.length - 1]?.hasMore ?? (defaultFilters && initialPage.hasMore)
   const loadedCount = listings.length
 
+  function selectCategory(nextCategory: ListingCategory) {
+    setCategory(nextCategory)
+    setSelectedBrand('all')
+    setCondition('all')
+    if (nextCategory !== 'cars') {
+      setMinPrice('')
+      setMaxPrice('')
+    }
+  }
+
   return (
     <main className="marketplace-home">
-      <section className="hero-section" aria-labelledby="marketplace-title">
-        <div className="hero-copy page-container">
-          <span className="eyebrow"><span className="eyebrow-dot" /> مَسار · سوق سوريا الشامل</span>
-          <h1 id="marketplace-title">كل ما تبحث عنه، في مكان واحد.</h1>
-          <p>سوق سوريا الشامل للسيارات والعقارات والأجهزة والأثاث والملابس بكل شفافية.</p>
-          <label className="hero-search">
+      <section className="marketplace-hero-section page-container" aria-labelledby="marketplace-title">
+        <div className="marketplace-hero-frame">
+          <span className="marketplace-hero-kicker"><span className="eyebrow-dot" /> مَسار · سوق سوريا الشامل</span>
+          <h1 id="marketplace-title">كل شيء تريده في مكان واحد.</h1>
+          <p>اكتشف ما تحتاجه في سوق سوريا — بخطوات واضحة وتواصل مباشر.</p>
+          <label className="hero-search marketplace-hero-search">
             <Search aria-hidden="true" />
             <span className="sr-only">ابحث فوراً في السوق</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث بالعربية أو الإنجليزية (مثال: كيا، شقة، آيفون، دمشق...)" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث عن سيارة، منزل، هاتف، أو محافظة..." />
             <span className="hero-search-hint" aria-hidden="true">اكتب للبحث</span>
           </label>
           <div className="hero-trust" aria-label="مزايا مَسار">
@@ -178,25 +178,23 @@ export function HomePage({ initialPage }: { initialPage: ListingsPage }) {
         </div>
       </section>
 
-      <section className="inventory-section" id="listings">
-        <div className="page-container">
-          <div className="section-heading">
-            <div><span className="eyebrow eyebrow-green">اختيرت بعناية</span><h2>تصفّح <span>السوق.</span></h2><p>ابحث بين الإعلانات المنشورة في مختلف الأقسام والمحافظات.</p></div>
-            <Link className="all-listings-link" href="/sell">أضف إعلانك <ArrowLeft aria-hidden="true" /></Link>
-          </div>
-
-          <nav className="marketplace-category-tabs" aria-label="الأقسام الرئيسية">
-            {categoryValues.map((item) => {
-              const Icon = item.id === 'all' ? Sparkles : categoryIcons[item.id]
-              return <button key={item.id} type="button" className={category === item.id ? 'marketplace-category-tab is-selected' : 'marketplace-category-tab'} aria-pressed={category === item.id} onClick={() => { setCategory(item.id); setSelectedBrand('all'); setCondition('all'); if (item.id !== 'cars') { setMinPrice(''); setMaxPrice('') } }}><Icon aria-hidden="true" /><span>{item.label}</span></button>
-            })}
-          </nav>
-
-          <div className="marketplace-toolbar">
+      <div className="marketplace-discovery page-container">
+        <div className="marketplace-control-row">
+          <Link className="marketplace-add-button" href="/sell"><span>+</span> إضافة إعلان</Link>
+          <div className="marketplace-filter-group" aria-label="تصفية الإعلانات">
             <label className="marketplace-select"><span>المحافظة</span><select value={governorate} onChange={(event) => setGovernorate(event.target.value)} aria-label="تصفية حسب المحافظة"><option value="">كل المحافظات</option>{syrianGovernorates.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
-            <label className="marketplace-select"><span>تاريخ النشر</span><select value={publicationPeriod} onChange={(event) => setPublicationPeriod(event.target.value as typeof publicationPeriod)} aria-label="تصفية حسب تاريخ النشر"><option value="all">الكل</option><option value="week">آخر أسبوع</option><option value="month">آخر شهر</option><option value="year">آخر سنة</option></select></label>
+            <label className="marketplace-select"><span>تاريخ النشر</span><select value={publicationPeriod} onChange={(event) => setPublicationPeriod(event.target.value as typeof publicationPeriod)} aria-label="تصفية حسب تاريخ النشر"><option value="all">الكل</option><option value="week">أسبوع</option><option value="month">شهر</option><option value="year">سنة</option></select></label>
+          </div>
+        </div>
+
+        <CategoryGrid selectedCategory={category} onSelect={selectCategory} />
+
+        <section className="inventory-section" id="listings" aria-labelledby="listings-title">
+          <div className="section-heading">
+            <div><span className="eyebrow eyebrow-green">اختيرت بعناية</span><h2 id="listings-title">تصفّح <span>السوق.</span></h2><p>إعلانات منشورة في مختلف الأقسام والمحافظات.</p></div>
             <span className="result-count"><Clock3 aria-hidden="true" /> {loadedCount}{hasMore ? '+' : ''} إعلان</span>
           </div>
+
           {category === 'cars' && <div className="marketplace-car-filters">
             <div className="filter-tabs" role="group" aria-label="تصفية السيارات حسب حالتها">{([['all', 'الكل'], ['new', 'جديدة'], ['used', 'مستعملة']] as const).map(([value, label]) => <button key={value} type="button" className={condition === value ? 'filter-chip is-selected' : 'filter-chip'} onClick={() => setCondition(value)} aria-pressed={condition === value}>{label}</button>)}</div>
             <fieldset className="price-filter"><legend className="sr-only">نطاق السعر بالدولار الأمريكي</legend><label><span className="sr-only">أقل سعر</span><input aria-label="أقل سعر بالدولار" type="number" min="1" inputMode="numeric" placeholder="من $" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label><span aria-hidden="true">–</span><label><span className="sr-only">أعلى سعر</span><input aria-label="أعلى سعر بالدولار" type="number" min="1" inputMode="numeric" placeholder="إلى $" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label></fieldset>
@@ -207,8 +205,8 @@ export function HomePage({ initialPage }: { initialPage: ListingsPage }) {
           {error && <p className="marketplace-fetch-error" role="alert">تعذّر تحميل الإعلانات. حدّث الصفحة للمحاولة مجدداً.</p>}
           {listings.length ? <div className="listing-grid">{listings.map((listing) => <ListingCard key={listing.id} listing={listing} />)}</div> : isLoading ? <p className="marketplace-loading" role="status">جارٍ تحميل الإعلانات…</p> : <div className="empty-results"><Search aria-hidden="true" /><strong>لا توجد إعلانات مطابقة</strong><span>جرّب تغيير كلمات البحث أو الفلاتر.</span></div>}
           {hasMore && <div className="marketplace-load-more-wrap"><button className="marketplace-load-more" type="button" onClick={() => setSize(size + 1)} disabled={isValidating}>{isValidating ? 'جارٍ تحميل المزيد…' : 'عرض المزيد'} <ArrowLeft aria-hidden="true" /></button></div>}
-        </div>
-      </section>
+        </section>
+      </div>
 
       <section className="sell-banner page-container">
         <div className="sell-banner-mark"><span className="banner-car-icon">مَ</span></div>

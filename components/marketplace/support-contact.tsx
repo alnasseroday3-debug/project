@@ -96,14 +96,14 @@ export function SupportContact() {
   return (
     <>
       <button
-        className="support-launch support-launch--floating"
+        className="support-launch support-launch--footer"
         type="button"
         aria-label="الدعم الفني والتواصل مع فريق مَسَار"
         aria-haspopup="dialog"
         onClick={openSupportDialog}
       >
         <img className="support-whatsapp-icon" src="/images/whatsapp.svg" alt="" aria-hidden="true" />
-        <span>الدعم والتواصل</span>
+        <span>تواصل مع الدعم</span>
       </button>
 
       <dialog ref={dialogRef} className="support-dialog" aria-labelledby={`${formId}-title`} onCancel={(event) => { if (isSubmitting) event.preventDefault() }} onClose={() => { setError(''); setChallenge(null); setCaptchaAnswer(''); setSubmission(null) }}>

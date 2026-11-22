@@ -8,6 +8,8 @@ import { ArrowLeft, ArrowRight, Armchair, Camera, CarFront, Check, CheckCircle2,
 import { resubmitRejectedListing, submitListing } from '@/app/actions/listings'
 import { compressImage, MAX_IMAGE_SOURCE_BYTES } from '@/lib/compress-image'
 import { listingCategories, listingCategoryLabels, type ListingCategory, type ListingDetails } from '@/lib/listing-categories'
+import { listingPreferencesStorageKey } from '@/lib/user-preferences'
+import { normalizePhoneNumber } from '@/lib/phone'
 
 const steps = [
   { title: 'القسم والأساسيات', caption: 'اختر القسم وأدخل بيانات الإعلان' },
@@ -221,10 +223,12 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
     }
     try {
       const storedDraft = window.localStorage.getItem(draftStorageKey)
+      let draftValues: Record<string, unknown> = {}
       if (storedDraft) {
         const draft: unknown = JSON.parse(storedDraft)
-        if (draft && typeof draft === 'object') {
+        if (draft && typeof draft === 'object' && !Array.isArray(draft)) {
           const values = draft as Record<string, unknown>
+          draftValues = values
           if (typeof values.category === 'string' && listingCategories.some((item) => item.id === values.category)) setCategory(values.category as ListingCategory)
           if (values.details && typeof values.details === 'object' && !Array.isArray(values.details)) setDetails(values.details as ListingDetails)
           if (typeof values.make === 'string') setMake(values.make)
@@ -245,6 +249,15 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
           if (typeof values.city === 'string') setCity(values.city)
           if (typeof values.description === 'string') setDescription(values.description)
           if (typeof values.sellerPhone === 'string') setSellerPhone(values.sellerPhone)
+        }
+      }
+      const savedPreferences = window.localStorage.getItem(listingPreferencesStorageKey(userId))
+      if (savedPreferences) {
+        const preferences: unknown = JSON.parse(savedPreferences)
+        if (preferences && typeof preferences === 'object' && !Array.isArray(preferences)) {
+          const values = preferences as Record<string, unknown>
+          if ((!draftValues.city || typeof draftValues.city !== 'string') && typeof values.governorate === 'string') setCity(values.governorate)
+          if ((!draftValues.sellerPhone || typeof draftValues.sellerPhone !== 'string') && typeof values.whatsappNumber === 'string') setSellerPhone(normalizePhoneNumber(values.whatsappNumber))
         }
       }
     } catch {
