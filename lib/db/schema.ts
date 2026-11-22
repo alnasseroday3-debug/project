@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core'
 import type { ListingCategory, ListingDetails } from '@/lib/listing-categories'
 
 export const user = pgTable('user', {
@@ -11,6 +11,8 @@ export const user = pgTable('user', {
   phoneNumber: text('phoneNumber').unique(),
   phoneNumberVerified: boolean('phoneNumberVerified').notNull().default(false),
   username: text('username').unique(),
+  governorate: text('governorate'),
+  messagingPublicKey: text('messaging_public_key'),
   role: text('role').notNull().default('user'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
@@ -129,6 +131,68 @@ export const rateLimits = pgTable('rate_limits', {
   count: integer('count').notNull().default(0),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 })
+
+export const userFollows = pgTable('user_follows', {
+  followerId: text('follower_id').notNull(),
+  followedId: text('followed_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.followerId, table.followedId] }),
+  index('user_follows_followed_idx').on(table.followedId, table.createdAt),
+])
+
+export const listingLikes = pgTable('listing_likes', {
+  userId: text('user_id').notNull(),
+  listingId: text('listing_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.listingId] }),
+  index('listing_likes_listing_idx').on(table.listingId),
+])
+
+export const listingComments = pgTable('listing_comments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  listingId: text('listing_id').notNull(),
+  authorId: text('author_id').notNull(),
+  body: varchar('body', { length: 1200 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index('listing_comments_listing_created_idx').on(table.listingId, table.createdAt)])
+
+export const socialNotifications = pgTable('social_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  recipientId: text('recipient_id').notNull(),
+  actorId: text('actor_id').notNull(),
+  notificationType: text('notification_type').notNull(),
+  entityId: text('entity_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  readAt: timestamp('read_at', { withTimezone: true }),
+}, (table) => [index('social_notifications_recipient_created_idx').on(table.recipientId, table.createdAt)])
+
+export const socialConversations = pgTable('social_conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  participantOne: text('participant_one').notNull(),
+  participantTwo: text('participant_two').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('social_conversations_participants_unique').on(table.participantOne, table.participantTwo),
+  index('social_conversations_participant_two_idx').on(table.participantTwo, table.updatedAt),
+])
+
+export const socialMessages = pgTable('social_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').notNull(),
+  senderId: text('sender_id').notNull(),
+  recipientId: text('recipient_id').notNull(),
+  ciphertext: text('ciphertext').notNull(),
+  iv: text('iv').notNull(),
+  senderWrappedKey: text('sender_wrapped_key').notNull(),
+  recipientWrappedKey: text('recipient_wrapped_key').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index('social_messages_conversation_created_idx').on(table.conversationId, table.createdAt)])
+
+export type SocialMessage = typeof socialMessages.$inferSelect
+export type SocialNotification = typeof socialNotifications.$inferSelect
 
 export type CarListing = typeof carListings.$inferSelect
 export type PublicCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'category' | 'details' | 'year' | 'condition' | 'mileage' | 'mileageUnknown' | 'askingPrice' | 'negotiable' | 'city' | 'images' | 'verified'>

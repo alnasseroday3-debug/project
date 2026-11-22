@@ -1,13 +1,15 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { eq } from 'drizzle-orm'
-import { ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, CircleX, Gauge, House, MapPin, Phone, Ruler, ShieldCheck, Smartphone, Store, Tag, Wrench } from 'lucide-react'
+import { and, eq } from 'drizzle-orm'
+import { ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, CircleX, Gauge, House, MapPin, MessageCircle, Phone, Ruler, ShieldCheck, Smartphone, Store, Tag, Wrench } from 'lucide-react'
 import { ShareListingButton } from '@/components/marketplace/share-listing-button'
 import { ListingGallery } from '@/components/marketplace/listing-gallery'
 import { ListingDetailActions } from '@/components/marketplace/listing-detail-actions'
+import { FollowButton } from '@/components/social/follow-controls'
+import { ListingSocialActions } from '@/components/social/listing-social-actions'
 import { getCurrentSession, isAdminEmail } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
-import { carListings } from '@/lib/db/schema'
+import { carListings, user, userFollows } from '@/lib/db/schema'
 import { listingCategoryLabels, type ListingCategory, type ListingDetails } from '@/lib/listing-categories'
 
 export const dynamic = 'force-dynamic'
@@ -127,6 +129,9 @@ export default async function CarPage({ params }: CarPageProps) {
   const session = await getCurrentSession()
   const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified, session.user.role))
   const canDelete = Boolean(session?.user && (session.user.id === car.userId || isAdmin))
+  const isOwner = session?.user?.id === car.userId
+  const [sellerAccount] = await db.select({ id: user.id }).from(user).where(eq(user.id, car.userId)).limit(1)
+  const [followRelation] = session?.user && !isOwner && sellerAccount ? await db.select({ followerId: userFollows.followerId }).from(userFollows).where(and(eq(userFollows.followerId, session.user.id), eq(userFollows.followedId, car.userId))).limit(1) : []
   const itemType = isCar
     ? 'سيارة'
     : selectedDetail(details, 'propertyType', 'propertyTypeOther') || selectedDetail(details, 'itemType', 'itemTypeOther') || listingCategoryLabels[category]
@@ -194,7 +199,7 @@ export default async function CarPage({ params }: CarPageProps) {
             </div>
           </section>}
 
-          <div className="seller-card"><span className="seller-avatar">{car.sellerName?.slice(0, 1) || 'م'}</span><div><span>المعلن</span><strong>{car.sellerName || 'معلن مَسَار'}</strong>{car.verified && <span className="seller-verified">موثق من مَسَار ✓</span>}</div>{car.verified && <BadgeCheck aria-label="إعلان موثق من مَسَار" />}</div>
+          <div className="seller-card"><span className="seller-avatar">{car.sellerName?.slice(0, 1) || 'م'}</span><div><span>المعلن</span>{sellerAccount ? <Link href={`/people/${encodeURIComponent(car.userId)}`}><strong>{car.sellerName || 'معلن مَسَار'}</strong></Link> : <strong>{car.sellerName || 'معلن مَسَار'}</strong>}{car.verified && <span className="seller-verified">موثق من مَسَار ✓</span>}</div>{session?.user && !isOwner && sellerAccount && <FollowButton userId={car.userId} initialFollowing={Boolean(followRelation)} />}{car.verified && <BadgeCheck aria-label="إعلان موثق من مَسَار" />}</div>
         </section>
 
         <aside className="detail-media-column" aria-label="صور الإعلان والتواصل">
@@ -205,6 +210,8 @@ export default async function CarPage({ params }: CarPageProps) {
           <div className="detail-contact-stack">
             {whatsappNumber ? <a className="whatsapp-button" href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer"><Phone aria-hidden="true" /> تواصل واتساب</a> : <button className="whatsapp-button" type="button" disabled><Phone aria-hidden="true" /> رقم التواصل غير متوفر</button>}
             {phone && !car.whatsappOnly && <a className="phone-button" href={`tel:${phone}`}><Phone aria-hidden="true" /> اتصال هاتفي</a>}
+            {!isOwner && sellerAccount && <Link className="social-message-link" href={session?.user ? `/messages?to=${encodeURIComponent(car.userId)}` : `/sign-in?next=${encodeURIComponent(`/messages?to=${car.userId}`)}`}><MessageCircle aria-hidden="true" /> مراسلة البائع داخل مَسار</Link>}
+            <ListingSocialActions listingId={car.id} isAuthenticated={Boolean(session?.user)} />
             <ShareListingButton />
             {canDelete && <ListingDetailActions listingId={car.id} isAdmin={isAdmin} />}
             <p className="secure-note"><BadgeCheck aria-hidden="true" /> الإعلان تمت مراجعته من فريق مَسَار</p>

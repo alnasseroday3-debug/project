@@ -2,7 +2,8 @@ import { and, desc, eq, gt, gte, ilike, lte, or, sql } from 'drizzle-orm'
 import { type ListingCategory, isListingCategory } from '@/lib/listing-categories'
 import { NextResponse, type NextRequest } from 'next/server'
 import { db } from '@/lib/db'
-import { carListings } from '@/lib/db/schema'
+import { carListings, userFollows } from '@/lib/db/schema'
+import { optionalSocialUser } from '@/lib/social/api'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +53,10 @@ function numberParameter(value: string | null, minimum: number, maximum: number)
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
+  const viewer = await optionalSocialUser()
+  const followedSeller = viewer
+    ? sql<boolean>`EXISTS (SELECT 1 FROM user_follows WHERE follower_id = ${viewer.id} AND followed_id = ${carListings.userId})`
+    : sql<boolean>`false`
   const requestedCategory = params.get('category') ?? 'all'
   const category = requestedCategory === 'all' || isListingCategory(requestedCategory) ? requestedCategory : 'all'
   const query = (params.get('q') ?? '').normalize('NFKC').trim().slice(0, 100)
@@ -119,10 +124,11 @@ export async function GET(request: NextRequest) {
       images: carListings.images,
       verified: carListings.verified,
       publishedAt: carListings.publishedAt,
+      followedSeller,
     })
     .from(carListings)
     .where(and(...filters))
-    .orderBy(sql`${carListings.publishedAt} DESC NULLS LAST`, desc(carListings.createdAt))
+    .orderBy(...(viewer ? [desc(followedSeller)] : []), sql`${carListings.publishedAt} DESC NULLS LAST`, desc(carListings.createdAt))
     .limit(pageSize + 1)
     .offset(offset)
 

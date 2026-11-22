@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CarPhoto } from '@/components/marketplace/car-photo'
+import { ListingSocialActions } from '@/components/social/listing-social-actions'
 import { CategoryGrid } from '@/components/marketplace/category-grid'
 import type { PublicCarListing } from '@/lib/db/schema'
 import { carImageUrl } from '@/lib/car-image-url'
@@ -36,6 +37,7 @@ type HomeListing = PublicCarListing & {
   transmission?: string | null
   paintCondition?: string | null
   publishedAt: Date | string | null
+  followedSeller?: boolean
 }
 
 type ListingsPage = { items: HomeListing[]; hasMore: boolean; pageSize: number; offset: number }
@@ -69,7 +71,7 @@ function conditionLabel(listing: HomeListing) {
   return ''
 }
 
-function ListingCard({ listing }: { listing: HomeListing }) {
+function ListingCard({ listing, isAuthenticated }: { listing: HomeListing; isAuthenticated: boolean }) {
   const category = listing.category ?? 'cars'
   const isCar = category === 'cars'
   const title = isCar ? [listing.make, listing.model].filter(Boolean).join(' ') : listing.make || listing.model
@@ -95,6 +97,7 @@ function ListingCard({ listing }: { listing: HomeListing }) {
         </div>
         <div className="listing-badges" aria-label="معلومات الإعلان">
           {listing.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار</span>}
+          {listing.followedSeller && <span className="social-followed-badge">من متابَعيك</span>}
           {listing.negotiable && <span className="listing-info-badge is-negotiable"><Tag aria-hidden="true" /> قابل للتفاوض</span>}
           {isCar && listing.transmission && <span className="listing-info-badge"><CarFront aria-hidden="true" /> {listing.transmission === 'automatic' ? 'أوتوماتيك' : listing.transmission === 'manual' ? 'عادي' : listing.transmission}</span>}
           {!isCar && detailBadges.map((badge) => <span className="listing-info-badge" key={badge}><CategoryIcon aria-hidden="true" /> {badge}</span>)}
@@ -107,13 +110,14 @@ function ListingCard({ listing }: { listing: HomeListing }) {
         <div className="listing-price-row">
           <p className="listing-price" dir="ltr"><strong>${money.format(listing.askingPrice)}</strong></p>
         </div>
+        <ListingSocialActions listingId={listing.id} isAuthenticated={isAuthenticated} compact />
         <Link className="listing-details-button" href={`/cars/${listing.id}`} aria-label={`عرض تفاصيل ${title}`}>عرض التفاصيل <ArrowLeft aria-hidden="true" /></Link>
       </div>
     </article>
   )
 }
 
-export function HomePage({ initialPage }: { initialPage: ListingsPage }) {
+export function HomePage({ initialPage, isAuthenticated }: { initialPage: ListingsPage; isAuthenticated: boolean }) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<'all' | ListingCategory>('all')
   const [governorate, setGovernorate] = useState('')
@@ -203,7 +207,7 @@ export function HomePage({ initialPage }: { initialPage: ListingsPage }) {
           {category === 'cars' && <div className="brand-filter-strip" role="group" aria-label="تصفية السيارات حسب الماركة"><button type="button" className={selectedBrand === 'all' ? 'brand-filter-chip is-selected' : 'brand-filter-chip'} onClick={() => setSelectedBrand('all')} aria-pressed={selectedBrand === 'all'}><CarFront aria-hidden="true" /><span>كل الماركات</span></button>{brands.map((brand) => <button key={brand.value} type="button" className={selectedBrand === brand.value ? 'brand-filter-chip is-selected' : 'brand-filter-chip'} onClick={() => setSelectedBrand(brand.value)} aria-pressed={selectedBrand === brand.value}><CarFront aria-hidden="true" /><span>{brand.label}</span></button>)}</div>}
 
           {error && <p className="marketplace-fetch-error" role="alert">تعذّر تحميل الإعلانات. حدّث الصفحة للمحاولة مجدداً.</p>}
-          {listings.length ? <div className="listing-grid">{listings.map((listing) => <ListingCard key={listing.id} listing={listing} />)}</div> : isLoading ? <p className="marketplace-loading" role="status">جارٍ تحميل الإعلانات…</p> : <div className="empty-results"><Search aria-hidden="true" /><strong>لا توجد إعلانات مطابقة</strong><span>جرّب تغيير كلمات البحث أو الفلاتر.</span></div>}
+          {listings.length ? <div className="listing-grid">{listings.map((listing) => <ListingCard key={listing.id} listing={listing} isAuthenticated={isAuthenticated} />)}</div> : isLoading ? <p className="marketplace-loading" role="status">جارٍ تحميل الإعلانات…</p> : <div className="empty-results"><Search aria-hidden="true" /><strong>لا توجد إعلانات مطابقة</strong><span>جرّب تغيير كلمات البحث أو الفلاتر.</span></div>}
           {hasMore && <div className="marketplace-load-more-wrap"><button className="marketplace-load-more" type="button" onClick={() => setSize(size + 1)} disabled={isValidating}>{isValidating ? 'جارٍ تحميل المزيد…' : 'عرض المزيد'} <ArrowLeft aria-hidden="true" /></button></div>}
         </section>
       </div>

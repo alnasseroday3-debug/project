@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { ListChecks, Menu, Plus, Settings, ShieldCheck, X } from 'lucide-react'
+import { SocialHeaderControls } from '@/components/social/header-controls'
 
 type HeaderUser = { id: string; name: string; email: string; emailVerified: boolean; role: string; image: string | null }
 
@@ -71,6 +72,7 @@ export function SiteHeader({ isAdmin, pendingCount, myListingsCount, sessionUser
           <Link className={pathname === '/sell' ? 'nav-link is-active nav-menu-sell' : 'nav-link nav-menu-sell'} href="/sell" onClick={closeMenu}><Plus aria-hidden="true" /><span>إضافة إعلان</span></Link>
           <Link className={pathname.startsWith('/my-listings') ? 'nav-link is-active nav-listings-link' : 'nav-link nav-listings-link'} href="/my-listings" onClick={closeMenu}><ListChecks aria-hidden="true" /><span>إعلاناتي</span>{sessionUser && <span className="nav-listings-badge" aria-label={`${myListingsCount} إعلانات`}>{myListingsCount > 99 ? '99+' : myListingsCount}</span>}</Link>
           <Link className={pathname === '/settings' ? 'nav-link is-active nav-settings-link' : 'nav-link nav-settings-link'} href="/settings" onClick={closeMenu}><Settings aria-hidden="true" /><span>الإعدادات</span></Link>
+          <SocialHeaderControls sessionUser={sessionUser} />
           {sessionUser && <div className="nav-account"><span className="nav-greeting">أهلًا، {sessionUser.name?.split(' ')[0] || 'بك'}</span><button className="nav-signout" type="button" onClick={handleSignOut}>تسجيل الخروج</button></div>}
         </nav>
       </div>
