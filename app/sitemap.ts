@@ -2,12 +2,11 @@ import { and, eq, gt } from 'drizzle-orm'
 import type { MetadataRoute } from 'next'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
-import { getSiteUrl } from '@/lib/site-url'
 
 export const dynamic = 'force-dynamic'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = getSiteUrl()
+  const siteUrl = new URL('https://odeu.vercel.app')
   const now = new Date()
   const listings = await db
     .select({ id: carListings.id, updatedAt: carListings.updatedAt })

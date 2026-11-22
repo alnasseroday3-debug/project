@@ -1,5 +1,4 @@
 import type { MetadataRoute } from 'next'
-import { getSiteUrl } from '@/lib/site-url'
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -8,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/admin', '/my-listings', '/sign-in', '/sign-up', '/api/'],
     },
-    sitemap: new URL('/sitemap.xml', getSiteUrl()).toString(),
+    sitemap: new URL('/sitemap.xml', 'https://odeu.vercel.app').toString(),
   }
 }
