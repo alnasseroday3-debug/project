@@ -4,13 +4,33 @@ import Image from 'next/image'
 import { CarPhoto } from '@/components/marketplace/car-photo'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowUpLeft, BadgeCheck, Check, ChevronDown, CircleHelp, Gauge, MapPin, Search, ShieldCheck, SlidersHorizontal, Sparkles, Tag } from 'lucide-react'
+import { ArrowLeft, ArrowUpLeft, BadgeCheck, CarFront, CircleHelp, Cog, Gauge, MapPin, Paintbrush, Search, ShieldCheck, SlidersHorizontal, Sparkles, Tag } from 'lucide-react'
 import type { PublicCarListing } from '@/lib/db/schema'
 import { carImageUrl } from '@/lib/car-image-url'
 
-const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
+type HomeCar = PublicCarListing & {
+  negotiationMin: number | null
+  negotiationMax: number | null
+  transmission?: string | null
+  paintCondition?: string | null
+}
 
-function ListingCard({ car }: { car: PublicCarListing }) {
+const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
+const brands = [
+  { label: 'الكل', value: 'all', aliases: [] },
+  { label: 'كيا', value: 'kia', aliases: ['كيا', 'kia'] },
+  { label: 'هيونداي', value: 'hyundai', aliases: ['هيونداي', 'هيونداى', 'hyundai'] },
+  { label: 'تويوتا', value: 'toyota', aliases: ['تويوتا', 'toyota'] },
+  { label: 'مرسيدس', value: 'mercedes', aliases: ['مرسيدس', 'مرسيدس بنز', 'mercedes', 'mercedes-benz'] },
+  { label: 'شيري', value: 'chery', aliases: ['شيري', 'chery'] },
+  { label: 'بيجو', value: 'peugeot', aliases: ['بيجو', 'peugeot'] },
+  { label: 'شيفروليه', value: 'chevrolet', aliases: ['شيفروليه', 'شفروليه', 'chevrolet'] },
+  { label: 'نيسان', value: 'nissan', aliases: ['نيسان', 'nissan'] },
+  { label: 'BMW', value: 'bmw', aliases: ['bmw', 'بي ام دبليو', 'بي إم دبليو'] },
+  { label: 'أودي', value: 'audi', aliases: ['أودي', 'اودي', 'audi'] },
+] as const
+
+function ListingCard({ car }: { car: HomeCar }) {
   return (
     <article className="listing-card">
       <Link className="listing-image-link" href={`/cars/${car.id}`} aria-label={`عرض ${car.make} ${car.model}`}>
@@ -26,7 +46,12 @@ function ListingCard({ car }: { car: PublicCarListing }) {
           </div>
           <span className="listing-year">{car.year}</span>
         </div>
-        {car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار ✓</span>}
+        <div className="listing-badges" aria-label="معلومات السيارة">
+          {car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار ✓</span>}
+          {(car.negotiationMin !== null || car.negotiationMax !== null) && <span className="listing-info-badge is-negotiable"><Tag aria-hidden="true" /> قابل للتفاوض</span>}
+          {car.transmission && <span className="listing-info-badge"><Cog aria-hidden="true" /> {car.transmission}</span>}
+          {car.paintCondition && <span className="listing-info-badge"><Paintbrush aria-hidden="true" /> {car.paintCondition}</span>}
+        </div>
         <div className="listing-meta">
           <span><Gauge aria-hidden="true" />{money.format(car.mileage)} كم</span>
           <span><MapPin aria-hidden="true" />{car.city || 'سوريا'}</span>
@@ -40,23 +65,27 @@ function ListingCard({ car }: { car: PublicCarListing }) {
   )
 }
 
-export function HomePage({ cars }: { cars: PublicCarListing[] }) {
+export function HomePage({ cars }: { cars: HomeCar[] }) {
   const [query, setQuery] = useState('')
   const [condition, setCondition] = useState<'all' | 'new' | 'used'>('all')
+  const [selectedBrand, setSelectedBrand] = useState<string>('all')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const filteredCars = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('ar')
     const minimum = minPrice === '' ? null : Number(minPrice)
     const maximum = maxPrice === '' ? null : Number(maxPrice)
+    const activeBrand = brands.find((brand) => brand.value === selectedBrand)
     return cars.filter((car) => {
       const matchesCondition = condition === 'all' || car.condition === condition
       const matchesMinimum = minimum === null || car.askingPrice >= minimum
       const matchesMaximum = maximum === null || car.askingPrice <= maximum
+      const normalizedMake = car.make.trim().toLocaleLowerCase('ar')
+      const matchesBrand = selectedBrand === 'all' || Boolean(activeBrand?.aliases.some((alias) => normalizedMake === alias.toLocaleLowerCase('ar')))
       const searchable = `${car.make} ${car.model} ${car.year} ${car.city ?? ''}`.toLocaleLowerCase('ar')
-      return matchesCondition && matchesMinimum && matchesMaximum && (!normalizedQuery || searchable.includes(normalizedQuery))
+      return matchesCondition && matchesMinimum && matchesMaximum && matchesBrand && (!normalizedQuery || searchable.includes(normalizedQuery))
     })
-  }, [cars, condition, maxPrice, minPrice, query])
+  }, [cars, condition, maxPrice, minPrice, query, selectedBrand])
 
   return (
     <main>
@@ -120,6 +149,15 @@ export function HomePage({ cars }: { cars: PublicCarListing[] }) {
               <label><span className="sr-only">أعلى سعر بالدولار</span><input aria-label="أعلى سعر بالدولار" type="number" min="0" inputMode="numeric" placeholder="إلى $" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
             </fieldset>
             <span className="result-count"><SlidersHorizontal aria-hidden="true" /> {filteredCars.length} إعلانات</span>
+          </div>
+
+          <div className="brand-filter-strip" role="group" aria-label="تصفية السيارات حسب الماركة">
+            {brands.map((brand) => (
+              <button key={brand.value} type="button" className={selectedBrand === brand.value ? 'brand-filter-chip is-selected' : 'brand-filter-chip'} onClick={() => setSelectedBrand(brand.value)} aria-pressed={selectedBrand === brand.value}>
+                <CarFront aria-hidden="true" />
+                <span>{brand.label}</span>
+              </button>
+            ))}
           </div>
 
           {filteredCars.length ? (

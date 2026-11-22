@@ -3,6 +3,7 @@ import { and, count, eq, ne } from 'drizzle-orm'
 import type { Metadata, Viewport } from 'next'
 import { SiteFooter } from '@/components/marketplace/site-footer'
 import { SiteHeader } from '@/components/marketplace/site-header'
+import { SupportContact } from '@/components/marketplace/support-contact'
 import { getCurrentSession, isAdminEmail } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
@@ -64,6 +65,7 @@ export default async function RootLayout({
         <SiteHeader isAdmin={isAdmin} pendingCount={pendingCount} myListingsCount={myListingsCount} sessionUser={session?.user ?? null} />
         {children}
         <SiteFooter isAdmin={isAdmin} />
+        <SupportContact />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

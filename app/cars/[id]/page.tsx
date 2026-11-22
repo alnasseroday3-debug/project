@@ -59,12 +59,14 @@ export default async function CarPage({ params }: CarPageProps) {
     ? image
     : `/api/car-images?listing=${encodeURIComponent(car.id)}&path=${encodeURIComponent(image)}`)
   const phoneDigits = car.sellerPhone?.replace(/\D/g, '')
-  const whatsappNumber = phoneDigits?.startsWith('0')
+  const whatsappNumber = phoneDigits?.startsWith('09')
     ? `963${phoneDigits.slice(1)}`
-    : phoneDigits && phoneDigits.length === 9 && phoneDigits.startsWith('9')
-      ? `963${phoneDigits}`
-      : phoneDigits
-  const whatsappMessage = encodeURIComponent(`مرحباً، أنا مهتم بـ ${car.make} ${car.model} ${car.year}. هل ما زالت متاحة؟`)
+    : phoneDigits?.startsWith('963')
+      ? phoneDigits
+      : phoneDigits && phoneDigits.length === 9 && phoneDigits.startsWith('9')
+        ? `963${phoneDigits}`
+        : phoneDigits
+  const whatsappMessage = encodeURIComponent(`مرحباً، شفت إعلان سيارتك (${car.make} ${car.model}، سنة الصنع ${car.year}) المعروضة على منصة مَسَار بسعر ${money.format(car.askingPrice)} دولار وحابب استفسر عنها.`)
   const phone = car.sellerPhone?.replace(/[^\d+]/g, '')
 
   return (

@@ -41,9 +41,10 @@ type ListingForEdit = {
   hasVerificationImage: boolean
 }
 
-export function ListingWizard({ userName, existingListing }: { userName: string; existingListing?: ListingForEdit }) {
+export function ListingWizard({ userId, userName, existingListing }: { userId: string; userName: string; existingListing?: ListingForEdit }) {
   const router = useRouter()
   const isEditing = Boolean(existingListing)
+  const draftStorageKey = `masar-listing-draft-v1:${userId}`
   const [step, setStep] = useState(0)
   const [make, setMake] = useState(existingListing?.make ?? '')
   const [model, setModel] = useState(existingListing?.model ?? '')
@@ -72,6 +73,57 @@ export function ListingWizard({ userName, existingListing }: { userName: string;
   const [compressing, setCompressing] = useState(false)
   const [error, setError] = useState('')
   const [complete, setComplete] = useState(false)
+  const [draftLoaded, setDraftLoaded] = useState(false)
+
+  useEffect(() => {
+    if (isEditing) {
+      setDraftLoaded(true)
+      return
+    }
+    try {
+      const storedDraft = window.localStorage.getItem(draftStorageKey)
+      if (storedDraft) {
+        const draft: unknown = JSON.parse(storedDraft)
+        if (draft && typeof draft === 'object') {
+          const values = draft as Record<string, unknown>
+          if (typeof values.make === 'string') setMake(values.make)
+          if (typeof values.model === 'string') setModel(values.model)
+          if (typeof values.year === 'string') setYear(values.year)
+          if (values.condition === 'new' || values.condition === 'used') setCondition(values.condition)
+          if (typeof values.mileage === 'string') setMileage(values.mileage)
+          if (typeof values.usageMonths === 'string') setUsageMonths(values.usageMonths)
+          if (values.maintenanceVisited === 'yes' || values.maintenanceVisited === 'no') setMaintenanceVisited(values.maintenanceVisited)
+          if (typeof values.maintenanceReason === 'string') setMaintenanceReason(values.maintenanceReason)
+          if (values.repaired === 'yes' || values.repaired === 'no') setRepaired(values.repaired)
+          if (typeof values.repairDetails === 'string') setRepairDetails(values.repairDetails)
+          if (values.partsChanged === 'yes' || values.partsChanged === 'no') setPartsChanged(values.partsChanged)
+          if (typeof values.changedParts === 'string') setChangedParts(values.changedParts)
+          if (typeof values.askingPrice === 'string') setAskingPrice(values.askingPrice)
+          if (typeof values.negotiationMin === 'string') setNegotiationMin(values.negotiationMin)
+          if (typeof values.negotiationMax === 'string') setNegotiationMax(values.negotiationMax)
+          if (typeof values.city === 'string') setCity(values.city)
+          if (typeof values.description === 'string') setDescription(values.description)
+          if (typeof values.sellerPhone === 'string') setSellerPhone(values.sellerPhone)
+        }
+      }
+    } catch {
+      // Storage can be unavailable in private browsing; the form remains usable.
+    }
+    setDraftLoaded(true)
+  }, [draftStorageKey, isEditing])
+
+  useEffect(() => {
+    if (!draftLoaded || isEditing || complete) return
+    try {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify({
+        make, model, year, condition, mileage, usageMonths, maintenanceVisited, maintenanceReason,
+        repaired, repairDetails, partsChanged, changedParts, askingPrice, negotiationMin,
+        negotiationMax, city, description, sellerPhone,
+      }))
+    } catch {
+      return
+    }
+  }, [askingPrice, changedParts, city, complete, condition, description, draftLoaded, draftStorageKey, isEditing, make, maintenanceReason, maintenanceVisited, mileage, model, negotiationMax, negotiationMin, partsChanged, repaired, repairDetails, sellerPhone, usageMonths, year])
 
   useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews])
   useEffect(() => () => {
@@ -210,6 +262,13 @@ export function ListingWizard({ userName, existingListing }: { userName: string;
         ? await resubmitRejectedListing(existingListing.id, draft)
         : await submitListing(draft)
       if (!result.success) throw new Error(result.message)
+      if (!isEditing) {
+        try {
+          window.localStorage.removeItem(draftStorageKey)
+        } catch {
+          // The listing is already submitted; storage cleanup must not undo success.
+        }
+      }
       setComplete(true)
       router.refresh()
     } catch (caught) {
@@ -251,6 +310,7 @@ export function ListingWizard({ userName, existingListing }: { userName: string;
 
         <form className="wizard-form" onSubmit={handleSubmit} noValidate>
           <div className="wizard-form-top"><span>الخطوة {String(step + 1).padStart(2, '0')} من 04</span><span>{steps[step].caption}</span></div>
+          {!isEditing && <p className="draft-save-note" role="status">تُحفظ تفاصيل الإعلان تلقائياً على هذا الجهاز.</p>}
           <div className="wizard-progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div>
 
           <div id="listing-step-0" hidden={step !== 0}>

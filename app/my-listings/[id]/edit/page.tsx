@@ -49,6 +49,7 @@ export default async function EditRejectedListingPage({ params }: EditListingPag
 
   return (
     <ListingWizard
+      userId={session.user.id}
       userName={session.user.name}
       existingListing={{
         ...editableListing,

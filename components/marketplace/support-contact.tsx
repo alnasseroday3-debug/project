@@ -14,7 +14,7 @@ const categories: { value: SupportCategory; label: string }[] = [
   { value: 'general_inquiry', label: 'استفسار عام' },
 ]
 
-export function SupportContact({ location }: { location: 'footer' | 'navigation' }) {
+export function SupportContact() {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const formId = useId()
   const [name, setName] = useState('')
@@ -96,13 +96,14 @@ export function SupportContact({ location }: { location: 'footer' | 'navigation'
   return (
     <>
       <button
-        className={`support-launch support-launch--${location}`}
+        className="support-launch support-launch--floating"
         type="button"
+        aria-label="الدعم الفني والتواصل مع فريق مَسَار"
         aria-haspopup="dialog"
         onClick={openSupportDialog}
       >
         <img className="support-whatsapp-icon" src="/images/whatsapp.svg" alt="" aria-hidden="true" />
-        <span>{location === 'footer' ? 'تواصل مع الدعم' : 'الدعم والتواصل'}</span>
+        <span>الدعم والتواصل</span>
       </button>
 
       <dialog ref={dialogRef} className="support-dialog" aria-labelledby={`${formId}-title`} onCancel={(event) => { if (isSubmitting) event.preventDefault() }} onClose={() => { setError(''); setChallenge(null); setCaptchaAnswer(''); setSubmission(null) }}>

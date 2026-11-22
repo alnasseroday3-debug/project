@@ -15,6 +15,8 @@ export default async function Page() {
       condition: carListings.condition,
       mileage: carListings.mileage,
       askingPrice: carListings.askingPrice,
+      negotiationMin: carListings.negotiationMin,
+      negotiationMax: carListings.negotiationMax,
       city: carListings.city,
       images: carListings.images,
       verified: carListings.verified,

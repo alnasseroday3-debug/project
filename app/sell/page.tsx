@@ -8,5 +8,5 @@ export default async function SellPage() {
   const session = await getCurrentSession()
   if (!session?.user) redirect('/sign-in?next=%2Fsell')
 
-  return <ListingWizard userName={session.user.name} />
+  return <ListingWizard userId={session.user.id} userName={session.user.name} />
 }

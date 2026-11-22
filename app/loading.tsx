@@ -2,7 +2,7 @@ export default function Loading() {
   return (
     <main className="route-loading" role="status" aria-live="polite">
       <span className="route-loading-spinner" aria-hidden="true" />
-      <span>جارٍ تحميل الصفحة…</span>
+      <span className="sr-only">جارٍ تحميل الصفحة…</span>
     </main>
   )
 }
