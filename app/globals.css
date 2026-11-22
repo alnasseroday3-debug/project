@@ -90,6 +90,7 @@ img { display: block; max-width: 100%; }
 .wordmark-icon svg { width: 21px; height: 21px; }
 .wordmark-dot { color: #bb8a52; }
 .site-nav { display: flex; align-items: center; gap: 34px; }
+.site-nav .nav-link { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .nav-link { position: relative; color: #666f68; font-size: 14px; transition: color .2s ease; }
 .nav-link:hover, .nav-link.is-active { color: var(--forest); }
 .nav-link.is-active::after { content: ''; position: absolute; inset-inline: 0; bottom: -31px; height: 2px; border-radius: 2px; background: var(--forest); }
@@ -1899,21 +1900,23 @@ body {
 :root[data-theme="dark"] .support-field select,
 :root[data-theme="dark"] .support-field textarea { border-color: var(--border-soft); background: #202023; color: #f4f4f5; }
 
-.site-header-inner { position: relative; }
-.mobile-menu-toggle { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border-soft); border-radius: 13px; background: var(--surface); color: var(--forest); cursor: pointer; }
-.mobile-menu-toggle svg { width: 20px; height: 20px; }
-.site-nav { position: absolute; z-index: 40; top: calc(100% + 10px); inset-inline-start: 0; width: min(330px, calc(100vw - 32px)); display: none; flex-direction: column; align-items: stretch; gap: 4px; border: 1px solid var(--border-soft); border-radius: 18px; padding: 9px; background: var(--surface); box-shadow: 0 20px 55px rgba(0, 0, 0, .3); }
-.site-nav.is-open { display: flex; }
-.site-nav .nav-link { min-height: 47px; display: flex; align-items: center; gap: 11px; border-radius: 11px; padding: 10px 12px; color: var(--text-strong); font-size: 13px; }
-.site-nav .nav-link:hover,
-.site-nav .nav-link.is-active { background: var(--surface-muted); color: var(--forest); }
-.site-nav .nav-link::after { display: none; }
-.site-nav .nav-link svg { width: 18px; height: 18px; color: var(--forest); }
-.site-nav .nav-admin-badge,
-.site-nav .nav-listings-badge { margin-inline-start: auto; }
-.site-nav .nav-account { justify-content: space-between; margin-top: 4px; border-top: 1px solid var(--border-soft); padding: 13px 10px 4px; }
-.site-nav .nav-greeting { color: var(--text-muted); font-size: 12px; }
-.site-nav .nav-signout { color: var(--forest); font-size: 12px; }
+@media (max-width: 760px) {
+  .site-header-inner { position: relative; }
+  .mobile-menu-toggle { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border-soft); border-radius: 13px; background: var(--surface); color: var(--forest); cursor: pointer; }
+  .mobile-menu-toggle svg { width: 20px; height: 20px; }
+  .site-nav { position: absolute; z-index: 40; top: calc(100% + 10px); inset-inline-start: 0; width: min(330px, calc(100vw - 32px)); display: none; flex-direction: column; align-items: stretch; gap: 4px; border: 1px solid var(--border-soft); border-radius: 18px; padding: 9px; background: var(--surface); box-shadow: 0 20px 55px rgba(0, 0, 0, .3); }
+  .site-nav.is-open { display: flex; }
+  .site-nav .nav-link { min-height: 47px; display: flex; align-items: center; gap: 11px; border-radius: 11px; padding: 10px 12px; color: var(--text-strong); font-size: 13px; }
+  .site-nav .nav-link:hover,
+  .site-nav .nav-link.is-active { background: var(--surface-muted); color: var(--forest); }
+  .site-nav .nav-link::after { display: none; }
+  .site-nav .nav-link svg { width: 18px; height: 18px; color: var(--forest); }
+  .site-nav .nav-admin-badge,
+  .site-nav .nav-listings-badge { margin-inline-start: auto; }
+  .site-nav .nav-account { justify-content: space-between; margin-top: 4px; border-top: 1px solid var(--border-soft); padding: 13px 10px 4px; }
+  .site-nav .nav-greeting { color: var(--text-muted); font-size: 12px; }
+  .site-nav .nav-signout { color: var(--forest); font-size: 12px; }
+}
 
 .marketplace-hero-section { padding-top: 27px; }
 .marketplace-hero-frame { position: relative; isolation: isolate; overflow: hidden; border: 1px solid rgba(16, 185, 129, .42); border-radius: 33px 42px 31px 46px / 29px 22px 37px 28px; padding: clamp(38px, 5.5vw, 76px) clamp(18px, 5vw, 72px); background: radial-gradient(ellipse at 50% -20%, rgba(16, 185, 129, .14), transparent 58%), linear-gradient(145deg, #151719, #0d0f10 75%); box-shadow: 0 0 0 1px rgba(16, 185, 129, .12), 0 18px 70px rgba(16, 185, 129, .11); text-align: center; }

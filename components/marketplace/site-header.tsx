@@ -45,6 +45,10 @@ export function SiteHeader({ isAdmin, pendingCount, myListingsCount, sessionUser
 
   const closeMenu = () => setMenuOpen(false)
 
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
+
   return (
     <header ref={headerRef} className="site-header">
       <div className="site-header-inner">
