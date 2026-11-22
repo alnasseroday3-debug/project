@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
@@ -28,7 +27,7 @@ import { CarPhoto } from '@/components/marketplace/car-photo'
 import type { PublicCarListing } from '@/lib/db/schema'
 import { carImageUrl } from '@/lib/car-image-url'
 import { listingAgeLabel } from '@/lib/listing-age'
-import { listingCategories, listingCategoryLabels, type ListingCategory } from '@/lib/listing-categories'
+import { listingCategoryLabels, type ListingCategory } from '@/lib/listing-categories'
 
 type HomeListing = PublicCarListing & {
   negotiationMin: number | null
@@ -57,7 +56,15 @@ const categoryIcons: Record<ListingCategory, LucideIcon> = {
   electronics: Smartphone,
   fashion: Shirt,
 }
-const categoryValues = [{ id: 'all' as const, label: 'الكل' }, ...listingCategories]
+const categoryValues: { id: 'all' | ListingCategory; label: string }[] = [
+  { id: 'all', label: 'الكل' },
+  { id: 'cars', label: 'السيارات والمركبات' },
+  { id: 'real_estate', label: 'العقارات والمنازل' },
+  { id: 'furniture', label: 'الأثاث المنزلي' },
+  { id: 'appliances', label: 'الأدوات الكهربائية' },
+  { id: 'electronics', label: 'الأجهزة الإلكترونية' },
+  { id: 'fashion', label: 'الملابس والأحذية' },
+]
 
 async function fetchListings(url: string): Promise<ListingsPage> {
   const response = await fetch(url)
@@ -152,31 +159,23 @@ export function HomePage({ initialPage }: { initialPage: ListingsPage }) {
 
   return (
     <main className="marketplace-home">
-      <section className="hero-section page-container">
-        <div className="hero-copy">
-          <span className="eyebrow"><span className="eyebrow-dot" /> مَسَار · سوق سوريا الشامل</span>
-          <h1>كل ما تبحث عنه،<br /><span>في مكان واحد.</span></h1>
-          <p>من المركبات والبيوت إلى تفاصيل الحياة اليومية، اكتشف خيارات موثوقة قريبة منك.</p>
-          <div className="hero-actions">
-            <a className="primary-button" href="#listings">تصفح السوق <ArrowLeft aria-hidden="true" /></a>
-            <Link className="hero-secondary" href="/sell">أضف إعلانك <ArrowUpLeft aria-hidden="true" /></Link>
+      <section className="hero-section" aria-labelledby="marketplace-title">
+        <div className="hero-copy page-container">
+          <span className="eyebrow"><span className="eyebrow-dot" /> مَسار · سوق سوريا الشامل</span>
+          <h1 id="marketplace-title">كل ما تبحث عنه، في مكان واحد.</h1>
+          <p>سوق سوريا الشامل للسيارات والعقارات والأجهزة والأثاث والملابس بكل شفافية.</p>
+          <label className="hero-search">
+            <Search aria-hidden="true" />
+            <span className="sr-only">ابحث فوراً في السوق</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ماذا تبحث عنه اليوم؟" />
+            <span className="hero-search-hint" aria-hidden="true">اكتب للبحث</span>
+          </label>
+          <div className="hero-trust" aria-label="مزايا مَسار">
+            <span><ShieldCheck aria-hidden="true" /> مراجعة قبل النشر</span>
+            <span><CircleHelp aria-hidden="true" /> تواصل مباشر</span>
+            <span><Tag aria-hidden="true" /> تفاصيل واضحة</span>
           </div>
-          <div className="hero-proof"><span className="proof-avatars" aria-hidden="true"><i>م</i><i>ر</i><i>س</i></span><span><strong>إعلانات يراجعها فريقنا</strong><br />لتسوق أوضح وأكثر ثقة.</span><ShieldCheck aria-hidden="true" className="proof-check" /></div>
         </div>
-        <div className="hero-visual">
-          <Image src="/images/syrian-marketplace-hero.png" alt="شارع دمشقي حديث يضم متاجر أثاث وأجهزة منزلية" fill priority unoptimized className="hero-image" />
-          <div className="hero-image-shade" />
-          <div className="hero-image-caption"><span>السوق السوري</span><strong>كل شيء يبدأ من مَسَار.</strong></div>
-          <div className="hero-index"><span>01</span><i /><span>06</span></div>
-        </div>
-        <div className="hero-bottom-note"><span>01 / اكتشف</span><span>اختيارات أقرب إليك، في كل سوريا</span></div>
-      </section>
-
-      <section className="trust-strip page-container" aria-label="مزايا مَسَار">
-        <div><ShieldCheck aria-hidden="true" /><span><strong>مراجعة قبل النشر</strong><small>كل إعلان يمر على فريقنا</small></span></div>
-        <div><Tag aria-hidden="true" /><span><strong>تفاصيل واضحة</strong><small>مواصفات تساعدك على الاختيار</small></span></div>
-        <div><CircleHelp aria-hidden="true" /><span><strong>تواصل مباشر</strong><small>تواصل مع صاحب الإعلان</small></span></div>
-        <div className="trust-note"><Sparkles aria-hidden="true" /> سوقك أقرب مما تتوقع</div>
       </section>
 
       <section className="inventory-section" id="listings">
@@ -194,13 +193,14 @@ export function HomePage({ initialPage }: { initialPage: ListingsPage }) {
           </nav>
 
           <div className="marketplace-toolbar">
-            <label className="search-box"><Search aria-hidden="true" /><span className="sr-only">ابحث بالاسم أو المحافظة أو المنطقة</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث بالاسم، المحافظة أو المنطقة" /></label>
             <label className="marketplace-select"><span>المحافظة</span><select value={governorate} onChange={(event) => setGovernorate(event.target.value)} aria-label="تصفية حسب المحافظة"><option value="">كل المحافظات</option>{syrianGovernorates.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
             <label className="marketplace-select"><span>تاريخ النشر</span><select value={publicationPeriod} onChange={(event) => setPublicationPeriod(event.target.value as typeof publicationPeriod)} aria-label="تصفية حسب تاريخ النشر"><option value="all">الكل</option><option value="week">آخر أسبوع</option><option value="month">آخر شهر</option><option value="year">آخر سنة</option></select></label>
-            {category === 'cars' && <div className="filter-tabs" role="group" aria-label="تصفية السيارات حسب حالتها">{([['all', 'الكل'], ['new', 'جديدة'], ['used', 'مستعملة']] as const).map(([value, label]) => <button key={value} type="button" className={condition === value ? 'filter-chip is-selected' : 'filter-chip'} onClick={() => setCondition(value)} aria-pressed={condition === value}>{label}</button>)}</div>}
-            {category === 'cars' && <fieldset className="price-filter"><legend className="sr-only">نطاق السعر بالدولار الأمريكي</legend><label><span className="sr-only">أقل سعر</span><input aria-label="أقل سعر بالدولار" type="number" min="1" inputMode="numeric" placeholder="من $" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label><span aria-hidden="true">–</span><label><span className="sr-only">أعلى سعر</span><input aria-label="أعلى سعر بالدولار" type="number" min="1" inputMode="numeric" placeholder="إلى $" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label></fieldset>}
             <span className="result-count"><Clock3 aria-hidden="true" /> {loadedCount}{hasMore ? '+' : ''} إعلان</span>
           </div>
+          {category === 'cars' && <div className="marketplace-car-filters">
+            <div className="filter-tabs" role="group" aria-label="تصفية السيارات حسب حالتها">{([['all', 'الكل'], ['new', 'جديدة'], ['used', 'مستعملة']] as const).map(([value, label]) => <button key={value} type="button" className={condition === value ? 'filter-chip is-selected' : 'filter-chip'} onClick={() => setCondition(value)} aria-pressed={condition === value}>{label}</button>)}</div>
+            <fieldset className="price-filter"><legend className="sr-only">نطاق السعر بالدولار الأمريكي</legend><label><span className="sr-only">أقل سعر</span><input aria-label="أقل سعر بالدولار" type="number" min="1" inputMode="numeric" placeholder="من $" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label><span aria-hidden="true">–</span><label><span className="sr-only">أعلى سعر</span><input aria-label="أعلى سعر بالدولار" type="number" min="1" inputMode="numeric" placeholder="إلى $" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label></fieldset>
+          </div>}
 
           {category === 'cars' && <div className="brand-filter-strip" role="group" aria-label="تصفية السيارات حسب الماركة"><button type="button" className={selectedBrand === 'all' ? 'brand-filter-chip is-selected' : 'brand-filter-chip'} onClick={() => setSelectedBrand('all')} aria-pressed={selectedBrand === 'all'}><CarFront aria-hidden="true" /><span>كل الماركات</span></button>{brands.map((brand) => <button key={brand.value} type="button" className={selectedBrand === brand.value ? 'brand-filter-chip is-selected' : 'brand-filter-chip'} onClick={() => setSelectedBrand(brand.value)} aria-pressed={selectedBrand === brand.value}><CarFront aria-hidden="true" /><span>{brand.label}</span></button>)}</div>}
 
