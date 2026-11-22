@@ -9,6 +9,7 @@ import { consumeRateLimit, getClientAddress } from '@/lib/rate-limit'
 import { cookies, headers } from 'next/headers'
 import { deleteListingBlobs, isOwnedPublicBlobUrl, verificationUploadCookie } from '@/lib/blob-storage'
 import { isListingCategory, type ListingCategory, type ListingDetails } from '@/lib/listing-categories'
+import { sanitizePlainText } from '@/lib/sanitize-text'
 
 type ListingDraft = {
   category?: ListingCategory
@@ -43,13 +44,7 @@ type ListingDraft = {
   verificationImageUpdated?: boolean
 }
 
-const cleanText = (value: unknown, maxLength: number) =>
-  typeof value === 'string'
-    ? value.normalize('NFKC').split('').filter((character) => {
-        const code = character.charCodeAt(0)
-        return code >= 32 && code !== 127
-      }).join('').trim().slice(0, maxLength)
-    : ''
+const cleanText = (value: unknown, maxLength: number) => sanitizePlainText(value, maxLength)
 const isWholeNumber = (value: unknown, minimum: number, maximum: number) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum && value <= maximum
 const isVehicleDetailsValid = (draft: ListingDraft) =>

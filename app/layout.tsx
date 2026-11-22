@@ -8,14 +8,30 @@ import { getCurrentSession, isAdminEmail } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
 import { archiveExpiredListings } from '@/lib/listing-lifecycle'
+import { getSiteUrl } from '@/lib/site-url'
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: getSiteUrl(),
   title: {
-    default: 'مَسَار | سوق السيارات في سوريا',
-    template: '%s | مَسَار',
+    default: 'مَسار. | سوق سوريا الشامل للسيارات والعقارات والأجهزة والأثاث',
+    template: '%s | مَسار.',
   },
-  description: 'اكتشف سيارات مستعملة وجديدة في سوريا بإعلانات واضحة ومراجعة دقيقة. مَسَار يقرّبك من سيارتك القادمة بثقة.',
+  description: 'اكتشف السيارات والعقارات والأجهزة والأثاث في سوريا عبر مَسار، سوق شامل بإعلانات واضحة ومراجعة دقيقة وتواصل مباشر.',
+  openGraph: {
+    title: 'مَسار. | سوق سوريا الشامل للسيارات والعقارات والأجهزة والأثاث',
+    description: 'اكتشف السيارات والعقارات والأجهزة والأثاث في سوريا عبر مَسار، سوق شامل بإعلانات واضحة ومراجعة دقيقة وتواصل مباشر.',
+    siteName: 'مَسار.',
+    locale: 'ar_SY',
+    type: 'website',
+    images: ['/images/syrian-marketplace-hero.png'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'مَسار. | سوق سوريا الشامل للسيارات والعقارات والأجهزة والأثاث',
+    description: 'اكتشف السيارات والعقارات والأجهزة والأثاث في سوريا عبر مَسار، سوق شامل بإعلانات واضحة ومراجعة دقيقة وتواصل مباشر.',
+    images: ['/images/syrian-marketplace-hero.png'],
+  },
   applicationName: 'مَسَار',
   generator: 'v0.app',
   icons: {

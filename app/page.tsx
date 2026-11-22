@@ -7,8 +7,8 @@ import { carListings } from '@/lib/db/schema'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: { absolute: 'مَسَار | سوق سوريا الشامل' },
-  description: 'تصفّح السيارات والعقارات والأثاث والأدوات الكهربائية والإلكترونيات والملابس في سوق سوريا الشامل من مَسَار.',
+  title: { absolute: 'مَسار. | سوق سوريا الشامل للسيارات والعقارات والأجهزة والأثاث' },
+  description: 'اكتشف السيارات والعقارات والأجهزة والأثاث في سوريا عبر مَسار، سوق شامل بإعلانات واضحة ومراجعة دقيقة وتواصل مباشر.',
 }
 
 export default async function Page() {
@@ -35,7 +35,7 @@ export default async function Page() {
       publishedAt: carListings.publishedAt,
     })
     .from(carListings)
-    .where(and(eq(carListings.status, 'approved'), gt(carListings.expiresAt, new Date())))
+    .where(and(eq(carListings.status, 'approved'), gt(carListings.expiresAt, new Date()), eq(carListings.hiddenByOwner, false)))
     .orderBy(sql`${carListings.publishedAt} DESC NULLS LAST`, desc(carListings.createdAt))
     .limit(13)
 

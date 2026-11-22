@@ -167,7 +167,7 @@ export function HomePage({ initialPage }: { initialPage: ListingsPage }) {
           <label className="hero-search">
             <Search aria-hidden="true" />
             <span className="sr-only">ابحث فوراً في السوق</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ماذا تبحث عنه اليوم؟" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ابحث بالعربية أو الإنجليزية (مثال: كيا، شقة، آيفون، دمشق...)" />
             <span className="hero-search-hint" aria-hidden="true">اكتب للبحث</span>
           </label>
           <div className="hero-trust" aria-label="مزايا مَسار">

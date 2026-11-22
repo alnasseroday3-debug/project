@@ -6,6 +6,7 @@ import { isAdminEmail } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
 import { deleteListingBlobs } from '@/lib/blob-storage'
+import { sanitizePlainText } from '@/lib/sanitize-text'
 
 function isSameOrigin(request: NextRequest) {
   return request.headers.get('origin') === new URL(request.url).origin
@@ -27,7 +28,7 @@ export async function PATCH(request: NextRequest) {
     const id = typeof values.id === 'string' ? values.id.slice(0, 80) : ''
     const status = values.status
     const verified = values.verified === true
-    const rejectionReason = typeof values.rejectionReason === 'string' ? values.rejectionReason : ''
+    const rejectionReason = sanitizePlainText(values.rejectionReason, 2000)
 
     if (values.action === 'archive-pending') {
       if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })

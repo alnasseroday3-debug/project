@@ -1,12 +1,36 @@
 import { and, desc, eq, gt, gte, ilike, lte, or, sql } from 'drizzle-orm'
+import { type ListingCategory, isListingCategory } from '@/lib/listing-categories'
 import { NextResponse, type NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
-import { isListingCategory } from '@/lib/listing-categories'
 
 export const dynamic = 'force-dynamic'
 
 const pageSize = 12
+const searchSynonymGroups: { aliases: string[]; categories?: ListingCategory[] }[] = [
+  { aliases: ['kia', 'كيا'] },
+  { aliases: ['toyota', 'تويوتا'] },
+  { aliases: ['hyundai', 'هيونداي', 'هيونداى'] },
+  { aliases: ['mercedes', 'مرسيدس', 'مرسيدس بنز'] },
+  { aliases: ['iphone', 'آيفون', 'ايفون', 'أيفون', 'ابل', 'أبل'] },
+  { aliases: ['samsung', 'سامسونج', 'سامسونغ'] },
+  { aliases: ['laptop', 'لابتوب', 'حاسوب محمول'] },
+  { aliases: ['apartment', 'apartments', 'flat', 'شقة', 'شقق'], categories: ['real_estate'] },
+  { aliases: ['car', 'cars', 'vehicle', 'vehicles', 'سيارة', 'سيارات', 'مركبة', 'مركبات'], categories: ['cars'] },
+  { aliases: ['real', 'estate', 'property', 'properties', 'عقار', 'عقارات', 'منزل', 'منازل'], categories: ['real_estate'] },
+  { aliases: ['furniture', 'أثاث', 'مفروشات'], categories: ['furniture'] },
+  { aliases: ['appliance', 'appliances', 'أجهزة كهربائية', 'أدوات كهربائية'], categories: ['appliances'] },
+  { aliases: ['electronics', 'electronic', 'إلكترونيات', 'الكترونيات', 'أجهزة إلكترونية'], categories: ['electronics'] },
+  { aliases: ['fashion', 'clothes', 'clothing', 'ملابس', 'أحذية'], categories: ['fashion'] },
+]
+const normalizeSearchTerm = (value: string) => value.normalize('NFKC').toLocaleLowerCase().replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+const searchSynonyms = new Map<string, { aliases: string[]; categories?: ListingCategory[] }>()
+for (const group of searchSynonymGroups) {
+  for (const alias of group.aliases) searchSynonyms.set(normalizeSearchTerm(alias), group)
+}
+const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, '\\$&')
+const searchableListingText = sql`concat_ws(' ', ${carListings.make}, ${carListings.model}, ${carListings.city}, ${carListings.description}, ${carListings.details}::text, CASE ${carListings.category} WHEN 'cars' THEN 'السيارات والمركبات cars' WHEN 'real_estate' THEN 'العقارات والمنازل real estate' WHEN 'furniture' THEN 'الأثاث المنزلي furniture' WHEN 'appliances' THEN 'الأدوات الكهربائية appliances' WHEN 'electronics' THEN 'الأجهزة الإلكترونية electronics' WHEN 'fashion' THEN 'الملابس والأحذية fashion' ELSE '' END)`
+
 const brandAliases: Record<string, string[]> = {
   kia: ['Kia', 'كيا'],
   hyundai: ['Hyundai', 'هيونداي', 'هيونداى'],
@@ -40,19 +64,23 @@ export async function GET(request: NextRequest) {
   const offset = numberParameter(params.get('offset'), 0, 100_000) ?? 0
   const filters = [
     eq(carListings.status, 'approved'),
+    eq(carListings.hiddenByOwner, false),
     gt(carListings.expiresAt, new Date()),
   ]
 
   if (category !== 'all') filters.push(eq(carListings.category, category))
   if (governorate) filters.push(eq(carListings.city, governorate))
   if (query) {
-    const pattern = `%${query}%`
-    filters.push(or(
-      ilike(carListings.make, pattern),
-      ilike(carListings.model, pattern),
-      ilike(carListings.city, pattern),
-      sql`${carListings.details}->>'district' ILIKE ${pattern}`,
-    )!)
+    const terms = [...new Set(query.split(/[^\p{L}\p{N}+#]+/u).map(normalizeSearchTerm).filter(Boolean))]
+    for (const term of terms) {
+      const synonymGroup = searchSynonyms.get(term)
+      const aliases = synonymGroup?.aliases ?? [term]
+      const matches = [
+        ...aliases.map((alias) => ilike(searchableListingText, `%${escapeLikePattern(alias)}%`)),
+        ...(synonymGroup?.categories ?? []).map((value) => eq(carListings.category, value)),
+      ]
+      filters.push(or(...matches)!)
+    }
   }
   if (period && ['week', 'month', 'year'].includes(period)) {
     const cutoff = new Date()

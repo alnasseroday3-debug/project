@@ -6,6 +6,7 @@ import { getClientAddress } from '@/lib/rate-limit'
 import { db } from '@/lib/db'
 import { supportTickets, type SupportCategory } from '@/lib/db/schema'
 import { isValidPhoneNumber, normalizePhoneNumber } from '@/lib/phone'
+import { sanitizePlainText } from '@/lib/sanitize-text'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,8 +61,7 @@ function verifyChallenge(token: string): ChallengePayload | null {
 }
 
 function cleanText(value: unknown, maximum: number) {
-  if (typeof value !== 'string') return ''
-  return value.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, maximum)
+  return sanitizePlainText(value, maximum)
 }
 
 function normalizeDigits(value: string) {
