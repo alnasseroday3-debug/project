@@ -15,6 +15,7 @@ type ListingDraft = {
   year: number
   condition: 'new' | 'used'
   mileage: number
+  mileageUnknown: boolean
   usageMonths: number | null
   maintenanceVisited: boolean
   maintenanceReason: string
@@ -25,6 +26,13 @@ type ListingDraft = {
   askingPrice: number
   negotiationMin: number | null
   negotiationMax: number | null
+  negotiable: boolean
+  paintCondition: string
+  paintDetails: string
+  transmission: string
+  fuelType: string
+  registrationStatus: string
+  whatsappOnly: boolean
   city: string
   description: string
   sellerPhone: string
@@ -41,6 +49,14 @@ const cleanText = (value: unknown, maxLength: number) =>
     : ''
 const isWholeNumber = (value: unknown, minimum: number, maximum: number) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum && value <= maximum
+const isVehicleDetailsValid = (draft: ListingDraft) =>
+  typeof draft.mileageUnknown === 'boolean' &&
+  typeof draft.negotiable === 'boolean' &&
+  typeof draft.whatsappOnly === 'boolean' &&
+  new Set(['clean', 'interior', 'panels']).has(draft.paintCondition) &&
+  new Set(['automatic', 'manual']).has(draft.transmission) &&
+  new Set(['gasoline', 'diesel', 'hybrid', 'electric']).has(draft.fuelType) &&
+  new Set(['syrian', 'new-entry', 'customs-cleared', 'immediate-transfer']).has(draft.registrationStatus)
 export async function submitListing(draft: ListingDraft) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return { success: false, message: 'سجّل الدخول أولاً لإرسال إعلانك.' }
@@ -71,11 +87,11 @@ export async function submitListing(draft: ListingDraft) {
     const booleansAreValid = typeof draft.maintenanceVisited === 'boolean' && typeof draft.repaired === 'boolean' && typeof draft.partsChanged === 'boolean'
     const negotiationIsValid = (value: unknown) => value === null || isWholeNumber(value, 1000, 100_000_000)
 
-    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid) {
+    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid || !isVehicleDetailsValid(draft)) {
       return { success: false, message: 'راجِع بيانات السيارة والسعر ورقم التواصل.' }
     }
-    if (!negotiationIsValid(draft.negotiationMin) || !negotiationIsValid(draft.negotiationMax) || images.length < 1 || images.length > 6) {
-      return { success: false, message: 'أضف من صورة واحدة إلى 6 صور، وتحقق من نطاق السعر.' }
+    if (!negotiationIsValid(draft.negotiationMin) || !negotiationIsValid(draft.negotiationMax) || images.length < 1 || images.length > 8) {
+      return { success: false, message: 'أضف من صورة واحدة إلى 8 صور، وتحقق من نطاق السعر.' }
     }
     if (draft.negotiationMin && draft.negotiationMax && draft.negotiationMin > draft.negotiationMax) {
       return { success: false, message: 'الحد الأدنى للتفاوض يجب أن يكون أقل من الحد الأعلى.' }
@@ -93,7 +109,8 @@ export async function submitListing(draft: ListingDraft) {
       model,
       year: draft.year,
       condition: draft.condition,
-      mileage: draft.condition === 'new' ? 0 : draft.mileage,
+      mileage: draft.condition === 'new' || draft.mileageUnknown ? 0 : draft.mileage,
+      mileageUnknown: draft.mileageUnknown,
       usageMonths: draft.condition === 'used' ? draft.usageMonths ?? 0 : 0,
       maintenanceVisited: draft.maintenanceVisited,
       maintenanceReason: draft.maintenanceVisited ? cleanText(draft.maintenanceReason, 500) || null : null,
@@ -104,6 +121,13 @@ export async function submitListing(draft: ListingDraft) {
       askingPrice: draft.askingPrice,
       negotiationMin: draft.negotiationMin,
       negotiationMax: draft.negotiationMax,
+      negotiable: draft.negotiable,
+      paintCondition: draft.paintCondition,
+      paintDetails: cleanText(draft.paintDetails, 250) || null,
+      transmission: draft.transmission,
+      fuelType: draft.fuelType,
+      registrationStatus: draft.registrationStatus,
+      whatsappOnly: draft.whatsappOnly,
       city,
       description: description || null,
       images,
@@ -225,11 +249,11 @@ export async function resubmitRejectedListing(listingId: string, draft: ListingD
     const booleansAreValid = typeof draft.maintenanceVisited === 'boolean' && typeof draft.repaired === 'boolean' && typeof draft.partsChanged === 'boolean'
     const negotiationIsValid = (value: unknown) => value === null || isWholeNumber(value, 1000, 100_000_000)
 
-    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid) {
+    if (!make || !model || !city || !phoneIsValid || !priceIsValid || !yearIsValid || !conditionIsValid || !mileageIsValid || !monthsIsValid || !booleansAreValid || !isVehicleDetailsValid(draft)) {
       return { success: false, message: 'راجِع بيانات السيارة والسعر ورقم التواصل.' }
     }
-    if (!negotiationIsValid(draft.negotiationMin) || !negotiationIsValid(draft.negotiationMax) || images.length < 1 || images.length > 6) {
-      return { success: false, message: 'أضف من صورة واحدة إلى 6 صور، وتحقق من نطاق السعر.' }
+    if (!negotiationIsValid(draft.negotiationMin) || !negotiationIsValid(draft.negotiationMax) || images.length < 1 || images.length > 8) {
+      return { success: false, message: 'أضف من صورة واحدة إلى 8 صور، وتحقق من نطاق السعر.' }
     }
     if (draft.negotiationMin && draft.negotiationMax && draft.negotiationMin > draft.negotiationMax) {
       return { success: false, message: 'الحد الأدنى للتفاوض يجب أن يكون أقل من الحد الأعلى.' }
@@ -248,7 +272,8 @@ export async function resubmitRejectedListing(listingId: string, draft: ListingD
         model,
         year: draft.year,
         condition: draft.condition,
-        mileage: draft.condition === 'new' ? 0 : draft.mileage,
+        mileage: draft.condition === 'new' || draft.mileageUnknown ? 0 : draft.mileage,
+        mileageUnknown: draft.condition === 'used' && draft.mileageUnknown,
         usageMonths: draft.condition === 'used' ? draft.usageMonths ?? 0 : 0,
         maintenanceVisited: draft.maintenanceVisited,
         maintenanceReason: draft.maintenanceVisited ? cleanText(draft.maintenanceReason, 500) || null : null,
@@ -259,6 +284,13 @@ export async function resubmitRejectedListing(listingId: string, draft: ListingD
         askingPrice: draft.askingPrice,
         negotiationMin: draft.negotiationMin,
         negotiationMax: draft.negotiationMax,
+        negotiable: draft.negotiable,
+        paintCondition: draft.paintCondition,
+        paintDetails: cleanText(draft.paintDetails, 250) || null,
+        transmission: draft.transmission,
+        fuelType: draft.fuelType,
+        registrationStatus: draft.registrationStatus,
+        whatsappOnly: draft.whatsappOnly,
         city,
         description: description || null,
         sellerPhone,

@@ -9,13 +9,79 @@ import { resubmitRejectedListing, submitListing } from '@/app/actions/listings'
 import { compressImage, MAX_IMAGE_SOURCE_BYTES } from '@/lib/compress-image'
 
 const steps = [
-  { title: 'السيارة', caption: 'التفاصيل الأساسية' },
-  { title: 'السجل', caption: 'الصيانة والحالة' },
-  { title: 'السعر', caption: 'السعر والموقع' },
-  { title: 'الصور', caption: 'اللمسات الأخيرة' },
+  { title: 'الأساسيات', caption: 'معلومات السيارة' },
+  { title: 'المواصفات', caption: 'تفاصيل السوق السوري' },
+  { title: 'الصور والتواصل', caption: 'الصور وبيانات المعلن' },
 ]
 
 const currentYear = new Date().getFullYear()
+const syrianGovernorates = ['دمشق', 'ريف دمشق', 'حلب', 'حمص', 'اللاذقية', 'طرطوس', 'حماة', 'إدلب', 'درعا', 'السويداء', 'دير الزور', 'الحسكة', 'الرقة', 'القنيطرة']
+const carModels: Record<string, string[]> = {
+  Toyota: ['Corolla', 'Camry', 'Prius', 'Yaris', 'RAV4', 'Land Cruiser', 'Hilux', 'Avanza'],
+  Hyundai: ['Accent', 'Elantra', 'Sonata', 'Tucson', 'Santa Fe', 'i10', 'i20'],
+  Kia: ['Rio', 'Cerato', 'Optima', 'Sportage', 'Sorento', 'Picanto'],
+  Nissan: ['Sunny', 'Altima', 'Sentra', 'Patrol', 'X-Trail', 'Qashqai'],
+  Mercedes: ['C-Class', 'E-Class', 'S-Class', 'A-Class', 'GLC', 'GLE'],
+  BMW: ['Series 3', 'Series 5', 'Series 7', 'X1', 'X3', 'X5'],
+  Chevrolet: ['Cruze', 'Malibu', 'Aveo', 'Captiva', 'Tahoe'],
+  Mitsubishi: ['Lancer', 'Pajero', 'Outlander', 'L200'],
+  Volkswagen: ['Golf', 'Passat', 'Jetta', 'Tiguan', 'Touareg'],
+  Renault: ['Logan', 'Symbol', 'Megane', 'Duster', 'Koleos'],
+  Suzuki: ['Swift', 'Ciaz', 'Vitara', 'Jimny', 'Grand Vitara'],
+  Ford: ['Focus', 'Fusion', 'Taurus', 'Explorer', 'Ranger'],
+  Honda: ['Civic', 'Accord', 'CR-V', 'City'],
+  Lexus: ['ES', 'IS', 'LS', 'RX', 'LX'],
+  Jeep: ['Cherokee', 'Grand Cherokee', 'Wrangler', 'Compass'],
+  Audi: ['A3', 'A4', 'A6', 'Q3', 'Q5', 'Q7'],
+  Opel: ['Astra', 'Corsa', 'Insignia', 'Mokka'],
+  Skoda: ['Octavia', 'Fabia', 'Superb', 'Kodiaq'],
+  Peugeot: ['301', '308', '508', '2008', '3008'],
+  MG: ['5', '6', 'ZS', 'HS'],
+  Chery: ['Arrizo 5', 'Tiggo 4', 'Tiggo 7', 'Tiggo 8'],
+  Geely: ['Emgrand', 'Coolray', 'Atlas'],
+}
+const makes = Object.keys(carModels)
+const paintChoices = [
+  { value: 'clean', label: 'خالية العلام جوا وبرا' },
+  { value: 'interior', label: 'خالية من الداخل — زنار' },
+  { value: 'panels', label: 'بخ قطعتين أو ثلاث' },
+]
+const transmissionChoices = [{ value: 'automatic', label: 'أوتوماتيك' }, { value: 'manual', label: 'عادي' }]
+const fuelChoices = [
+  { value: 'gasoline', label: 'بنزين' },
+  { value: 'diesel', label: 'مازوت' },
+  { value: 'hybrid', label: 'هايبرد' },
+  { value: 'electric', label: 'كهرباء' },
+]
+const registrationChoices = [
+  { value: 'syrian', label: 'نمرة سورية نظامية' },
+  { value: 'new-entry', label: 'إدخال جديد' },
+  { value: 'customs-cleared', label: 'مجمركة' },
+  { value: 'immediate-transfer', label: 'فراغ فوري' },
+]
+
+function ChoiceField({ label, name, value, options, onChange, className = '' }: {
+  label: string
+  name: string
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+  className?: string
+}) {
+  return (
+    <fieldset className={`choice-field ${className}`}>
+      <legend>{label}</legend>
+      <div className="choice-options">
+        {options.map((option) => (
+          <label className={`choice-option${value === option.value ? ' is-selected' : ''}`} key={option.value}>
+            <input type="radio" name={name} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} required />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
 
 type ListingForEdit = {
   id: string
@@ -24,6 +90,7 @@ type ListingForEdit = {
   year: number
   condition: 'new' | 'used'
   mileage: number
+  mileageUnknown: boolean
   usageMonths: number | null
   maintenanceVisited: boolean
   maintenanceReason: string | null
@@ -34,6 +101,13 @@ type ListingForEdit = {
   askingPrice: number
   negotiationMin: number | null
   negotiationMax: number | null
+  negotiable: boolean
+  paintCondition: string | null
+  paintDetails: string | null
+  transmission: string | null
+  fuelType: string | null
+  registrationStatus: string | null
+  whatsappOnly: boolean
   city: string | null
   description: string | null
   sellerPhone: string | null
@@ -47,11 +121,21 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
   const draftStorageKey = `masar-listing-draft-v1:${userId}`
   const [step, setStep] = useState(0)
   const [make, setMake] = useState(existingListing?.make ?? '')
+  const [makeChoice, setMakeChoice] = useState(existingListing ? (makes.includes(existingListing.make) ? existingListing.make : existingListing.make ? 'other' : '') : '')
   const [model, setModel] = useState(existingListing?.model ?? '')
+  const [customModelActive, setCustomModelActive] = useState(Boolean(existingListing?.model && !carModels[existingListing.make]?.includes(existingListing.model)))
   const [year, setYear] = useState(String(existingListing?.year ?? currentYear))
   const [condition, setCondition] = useState<'new' | 'used'>(existingListing?.condition ?? 'used')
   const [mileage, setMileage] = useState(String(existingListing?.mileage ?? ''))
+  const [mileageUnknown, setMileageUnknown] = useState(existingListing?.mileageUnknown ?? false)
   const [usageMonths, setUsageMonths] = useState(String(existingListing?.usageMonths ?? ''))
+  const [negotiable, setNegotiable] = useState(existingListing?.negotiable ?? Boolean(existingListing?.negotiationMin || existingListing?.negotiationMax))
+  const [paintCondition, setPaintCondition] = useState(existingListing ? existingListing.paintCondition ?? '' : 'clean')
+  const [paintDetails, setPaintDetails] = useState(existingListing?.paintDetails ?? '')
+  const [transmission, setTransmission] = useState(existingListing ? existingListing.transmission ?? '' : 'automatic')
+  const [fuelType, setFuelType] = useState(existingListing ? existingListing.fuelType ?? '' : 'gasoline')
+  const [registrationStatus, setRegistrationStatus] = useState(existingListing ? existingListing.registrationStatus ?? '' : 'syrian')
+  const [whatsappOnly, setWhatsappOnly] = useState(existingListing?.whatsappOnly ?? false)
   const [maintenanceVisited, setMaintenanceVisited] = useState(existingListing ? (existingListing.maintenanceVisited ? 'yes' : 'no') : 'yes')
   const [maintenanceReason, setMaintenanceReason] = useState(existingListing?.maintenanceReason ?? '')
   const [repaired, setRepaired] = useState(existingListing ? (existingListing.repaired ? 'yes' : 'no') : 'no')
@@ -74,6 +158,13 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
   const [error, setError] = useState('')
   const [complete, setComplete] = useState(false)
   const [draftLoaded, setDraftLoaded] = useState(false)
+  const makeIsKnown = makes.includes(make)
+  const makeOptionValue = makeIsKnown ? make : make ? 'other' : makeChoice
+  const showCustomMake = makeOptionValue === 'other'
+  const modelOptions = carModels[make] ?? []
+  const useCustomModel = customModelActive || Boolean(model && !modelOptions.includes(model))
+  const selectedModel = modelOptions.includes(model) ? model : ''
+  const existingCityNotListed = Boolean(existingListing?.city && !syrianGovernorates.includes(existingListing.city))
 
   useEffect(() => {
     if (isEditing) {
@@ -133,8 +224,8 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget
     const selected = Array.from(input.files || [])
-    if (selected.length + existingImages.length > 6) {
-      setError('يمكنك الاحتفاظ بما مجموعه 6 صور كحد أقصى.')
+    if (selected.length + existingImages.length > 8) {
+      setError('يمكنك الاحتفاظ بما مجموعه 8 صور كحد أقصى.')
       input.value = ''
       return
     }
@@ -241,7 +332,8 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
         model,
         year: Number(year),
         condition,
-        mileage: condition === 'new' ? 0 : Number(mileage),
+        mileage: condition === 'new' || mileageUnknown ? 0 : Number(mileage),
+        mileageUnknown: condition === 'used' && mileageUnknown,
         usageMonths: condition === 'new' ? 0 : Number(usageMonths),
         maintenanceVisited: maintenanceVisited === 'yes',
         maintenanceReason,
@@ -250,8 +342,15 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
         partsChanged: partsChanged === 'yes',
         changedParts,
         askingPrice: Number(askingPrice),
-        negotiationMin: negotiationMin ? Number(negotiationMin) : null,
-        negotiationMax: negotiationMax ? Number(negotiationMax) : null,
+        negotiationMin: negotiable && negotiationMin ? Number(negotiationMin) : null,
+        negotiationMax: negotiable && negotiationMax ? Number(negotiationMax) : null,
+        negotiable,
+        paintCondition,
+        paintDetails,
+        transmission,
+        fuelType,
+        registrationStatus,
+        whatsappOnly,
         city,
         description,
         sellerPhone,
@@ -309,55 +408,59 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
         </aside>
 
         <form className="wizard-form" onSubmit={handleSubmit} noValidate>
-          <div className="wizard-form-top"><span>الخطوة {String(step + 1).padStart(2, '0')} من 04</span><span>{steps[step].caption}</span></div>
+          <div className="wizard-form-top"><span>الخطوة {String(step + 1).padStart(2, '0')} من 03</span><span>{steps[step].caption}</span></div>
           {!isEditing && <p className="draft-save-note" role="status">تُحفظ تفاصيل الإعلان تلقائياً على هذا الجهاز.</p>}
           <div className="wizard-progress"><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div>
 
           <div id="listing-step-0" hidden={step !== 0}>
-            <div className="form-section-heading"><span className="eyebrow eyebrow-green">أولاً، لنتعرف عليها</span><h2>ما هي سيارتك؟</h2><p>أخبرنا عن الأساسيات، ونكمل بعدها التفاصيل.</p></div>
+            <div className="form-section-heading"><span className="eyebrow eyebrow-green">الخطوة الأولى · المعلومات الأساسية</span><h2>ما هي سيارتك؟</h2><p>اختر الماركة أولاً لتظهر الموديلات الشائعة المناسبة لها.</p></div>
             <div className="form-grid">
-              <label className="form-field"><span>الشركة المصنّعة</span><input className="plain-input" value={make} onChange={(event) => setMake(event.target.value)} placeholder="مثال: تويوتا" required maxLength={50} /></label>
-              <label className="form-field"><span>الموديل</span><input className="plain-input" value={model} onChange={(event) => setModel(event.target.value)} placeholder="مثال: كامري" required maxLength={60} /></label>
-              <label className="form-field"><span>سنة الصنع</span><input className="plain-input" type="number" inputMode="numeric" min="1980" max={currentYear + 1} value={year} onChange={(event) => setYear(event.target.value)} required /></label>
-              <label className="form-field"><span>حالة السيارة</span><select className="plain-input" value={condition} onChange={(event) => setCondition(event.target.value as 'new' | 'used')}><option value="used">مستعملة</option><option value="new">جديدة</option></select></label>
+              <label className="form-field"><span>الشركة المصنّعة</span><select className="plain-input" value={makeOptionValue} onChange={(event) => { const value = event.target.value; setMakeChoice(value); setMake(value === 'other' ? '' : value); setModel(''); setCustomModelActive(false) }} required><option value="">اختر الماركة</option>{makes.map((item) => <option value={item} key={item}>{item}</option>)}<option value="other">ماركة أخرى</option></select></label>
+              {showCustomMake && <label className="form-field"><span>اكتب الماركة</span><input className="plain-input" value={make} onChange={(event) => { setMake(event.target.value); setModel(''); setCustomModelActive(false) }} placeholder="اسم الشركة المصنّعة" required maxLength={50} /></label>}
+              {makeIsKnown ? <label className="form-field"><span>الموديل</span>{!useCustomModel ? <select className="plain-input" value={selectedModel} onChange={(event) => { const value = event.target.value; setModel(value === 'other' ? '' : value); setCustomModelActive(value === 'other') }} required><option value="">اختر الموديل</option>{modelOptions.map((item) => <option value={item} key={item}>{item}</option>)}<option value="other">موديل آخر</option></select> : <input className="plain-input" value={model} onChange={(event) => setModel(event.target.value)} placeholder="اكتب الموديل" required maxLength={60} />}</label> : <label className="form-field"><span>الموديل</span><input className="plain-input" value={model} onChange={(event) => setModel(event.target.value)} placeholder="اكتب الموديل" required maxLength={60} disabled={!make.trim()} /></label>}
+              <label className="form-field"><span>سنة الصنع</span><select className="plain-input" value={year} onChange={(event) => setYear(event.target.value)} required><option value="">اختر السنة</option>{Array.from({ length: currentYear + 2 - 1980 }, (_, index) => currentYear + 1 - index).map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+              <ChoiceField label="حالة السيارة" name="condition" value={condition} options={[{ value: 'used', label: 'مستعملة' }, { value: 'new', label: 'جديدة زيرو' }]} onChange={(value) => setCondition(value as 'new' | 'used')} className="form-field-wide" />
               {condition === 'used' && <>
-                <label className="form-field"><span>الممشى (كم)</span><input className="plain-input" type="number" inputMode="numeric" min="0" max="2000000" value={mileage} onChange={(event) => setMileage(event.target.value)} placeholder="مثال: 32,000" required /></label>
-                <label className="form-field"><span>مدة الاستخدام (بالأشهر)</span><input className="plain-input" type="number" inputMode="numeric" min="0" max="1200" value={usageMonths} onChange={(event) => setUsageMonths(event.target.value)} placeholder="مثال: 24" required /></label>
+                <label className="form-field"><span>الممشى (العداد بالكم)</span><input className="plain-input" type="number" inputMode="numeric" min="0" max="2000000" value={mileage} onChange={(event) => setMileage(event.target.value)} placeholder="مثال: 32,000" required={!mileageUnknown} disabled={mileageUnknown} /></label>
+                <label className="form-checkbox mileage-unknown"><input type="checkbox" checked={mileageUnknown} onChange={(event) => setMileageUnknown(event.target.checked)} /><span>العداد متوقف / لا أعلم</span></label>
+                <label className="form-field"><span>مدة الاستخدام <small>اختياري · بالأشهر</small></span><input className="plain-input" type="number" inputMode="numeric" min="0" max="1200" value={usageMonths} onChange={(event) => setUsageMonths(event.target.value)} placeholder="مثال: 24" /></label>
               </>}
+              <label className="form-field"><span>السعر بالدولار الأمريكي ($)</span><input className="plain-input" type="number" inputMode="numeric" min="1000" max="100000000" value={askingPrice} onChange={(event) => setAskingPrice(event.target.value)} placeholder="مثال: 24,500" required /></label>
+              <label className="form-checkbox negotiable-toggle"><input type="checkbox" checked={negotiable} onChange={(event) => setNegotiable(event.target.checked)} /><span>السعر قابل للتفاوض</span></label>
+              <label className="form-field"><span>المحافظة</span><select className="plain-input" value={city} onChange={(event) => setCity(event.target.value)} required><option value="">اختر المحافظة</option>{syrianGovernorates.map((governorate) => <option value={governorate} key={governorate}>{governorate}</option>)}{existingCityNotListed && <option value={city}>{city} (القيمة الحالية)</option>}</select></label>
             </div>
           </div>
 
           <div id="listing-step-1" hidden={step !== 1}>
-            <div className="form-section-heading"><span className="eyebrow eyebrow-green">سجل واضح، ثقة أكبر</span><h2>كيف كانت رحلتها؟</h2><p>نحرص على إظهار معلومات تساعد المشتري على الاختيار.</p></div>
-            <div className="form-stack">
-              <label className="form-field"><span>هل زارت السيارة مراكز الصيانة؟</span><select className="plain-input" value={maintenanceVisited} onChange={(event) => setMaintenanceVisited(event.target.value)}><option value="yes">نعم</option><option value="no">لا</option></select></label>
-              {maintenanceVisited === 'yes' && <label className="form-field"><span>ما سبب زيارات الصيانة؟</span><textarea className="plain-input plain-textarea" value={maintenanceReason} onChange={(event) => setMaintenanceReason(event.target.value)} placeholder="مثال: صيانة دورية كل 10,000 كم" maxLength={500} /></label>}
-              <label className="form-field"><span>هل سبق إصلاح السيارة؟</span><select className="plain-input" value={repaired} onChange={(event) => setRepaired(event.target.value)}><option value="no">لا</option><option value="yes">نعم</option></select></label>
-              {repaired === 'yes' && <label className="form-field"><span>تفاصيل الإصلاح</span><textarea className="plain-input plain-textarea" value={repairDetails} onChange={(event) => setRepairDetails(event.target.value)} placeholder="اذكر الإصلاحات وتوقيتها إن أمكن" maxLength={500} required /></label>}
-              <label className="form-field"><span>هل تم تغيير أي قطع؟</span><select className="plain-input" value={partsChanged} onChange={(event) => setPartsChanged(event.target.value)}><option value="no">لا</option><option value="yes">نعم</option></select></label>
-              {partsChanged === 'yes' && <label className="form-field"><span>ما القطع التي تم تغييرها؟</span><textarea className="plain-input plain-textarea" value={changedParts} onChange={(event) => setChangedParts(event.target.value)} placeholder="مثال: بطارية، إطارات..." maxLength={500} required /></label>}
+            <div className="form-section-heading"><span className="eyebrow eyebrow-green">الخطوة الثانية · مواصفات السوق السوري</span><h2>تفاصيل تهمّ المشتري.</h2><p>اختيارات سريعة وواضحة، مع مساحة لتوضيح حالة الدهان.</p></div>
+            <div className="form-grid market-specs-grid">
+              <ChoiceField label="حالة البخ (الدهان)" name="paintCondition" value={paintCondition} options={paintChoices} onChange={setPaintCondition} className="form-field-wide" />
+              {paintCondition !== 'clean' && <label className="form-field form-field-wide"><span>مكان البخ أو ملاحظات الدهان <small>اختياري</small></span><input className="plain-input" value={paintDetails} onChange={(event) => setPaintDetails(event.target.value)} placeholder="مثال: باب أمامي يمين ورفرف خلفي" maxLength={250} /></label>}
+              <ChoiceField label="نوع الغيار (الفيتيس)" name="transmission" value={transmission} options={transmissionChoices} onChange={setTransmission} />
+              <ChoiceField label="نوع الوقود" name="fuelType" value={fuelType} options={fuelChoices} onChange={setFuelType} />
+              <ChoiceField label="حالة الأوراق والنمرة" name="registrationStatus" value={registrationStatus} options={registrationChoices} onChange={setRegistrationStatus} className="form-field-wide" />
             </div>
+            <section className="seller-transparency">
+              <div className="seller-transparency-heading"><span className="eyebrow eyebrow-green">شفافية من البائع</span><h3>سجل الصيانة والحالة الفنية</h3></div>
+              <div className="form-grid">
+                <ChoiceField label="هل زارت السيارة مراكز الصيانة؟" name="maintenanceVisited" value={maintenanceVisited} options={[{ value: 'yes', label: 'نعم' }, { value: 'no', label: 'لا' }]} onChange={setMaintenanceVisited} />
+                <ChoiceField label="هل سبق إصلاح السيارة؟" name="repaired" value={repaired} options={[{ value: 'no', label: 'لا' }, { value: 'yes', label: 'نعم' }]} onChange={setRepaired} />
+                <ChoiceField label="هل تم تغيير أي قطع؟" name="partsChanged" value={partsChanged} options={[{ value: 'no', label: 'لا' }, { value: 'yes', label: 'نعم' }]} onChange={setPartsChanged} />
+                {maintenanceVisited === 'yes' && <label className="form-field form-field-wide"><span>ما سبب زيارات الصيانة؟</span><textarea className="plain-input plain-textarea" value={maintenanceReason} onChange={(event) => setMaintenanceReason(event.target.value)} placeholder="مثال: صيانة دورية كل 10,000 كم" maxLength={500} /></label>}
+                {repaired === 'yes' && <label className="form-field form-field-wide"><span>تفاصيل الإصلاح</span><textarea className="plain-input plain-textarea" value={repairDetails} onChange={(event) => setRepairDetails(event.target.value)} placeholder="اذكر الإصلاحات وتوقيتها إن أمكن" maxLength={500} required /></label>}
+                {partsChanged === 'yes' && <label className="form-field form-field-wide"><span>ما القطع التي تم تغييرها؟</span><textarea className="plain-input plain-textarea" value={changedParts} onChange={(event) => setChangedParts(event.target.value)} placeholder="مثال: بطارية، إطارات..." maxLength={500} required /></label>}
+              </div>
+            </section>
           </div>
 
           <div id="listing-step-2" hidden={step !== 2}>
-            <div className="form-section-heading"><span className="eyebrow eyebrow-green">قيمة واضحة</span><h2>السعر والموقع.</h2><p>السعر الواضح يختصر الطريق بينك وبين المشتري المناسب.</p></div>
-            <div className="form-grid">
-              <label className="form-field"><span>السعر المطلوب (USD)</span><input className="plain-input" type="number" inputMode="numeric" min="1000" max="100000000" value={askingPrice} onChange={(event) => setAskingPrice(event.target.value)} placeholder="مثال: 24,500" required /></label>
-              <label className="form-field"><span>المدينة أو المنطقة</span><input className="plain-input" list="syrian-cities" value={city} onChange={(event) => setCity(event.target.value)} placeholder="اختر مدينة أو اكتبها" required maxLength={60} /><datalist id="syrian-cities"><option value="دمشق" /><option value="حلب" /><option value="حمص" /><option value="اللاذقية" /><option value="طرطوس" /><option value="حماة" /></datalist></label>
-              <label className="form-field"><span>أقل سعر تقبل به (USD) <small>اختياري</small></span><input className="plain-input" type="number" min="1000" value={negotiationMin} onChange={(event) => setNegotiationMin(event.target.value)} placeholder="$ USD" /></label>
-              <label className="form-field"><span>أعلى سعر متوقع (USD) <small>اختياري</small></span><input className="plain-input" type="number" min="1000" value={negotiationMax} onChange={(event) => setNegotiationMax(event.target.value)} placeholder="$ USD" /></label>
-              <label className="form-field form-field-wide"><span>رقم التواصل (مطلوب)</span><input className="plain-input" type="tel" inputMode="tel" value={sellerPhone} onChange={(event) => setSellerPhone(event.target.value)} placeholder="+963 9XX XXX XXX" pattern="\+?[0-9\s()-]{8,20}" required /></label>
-              <label className="form-field form-field-wide"><span>نبذة عن السيارة <small>اختياري</small></span><textarea className="plain-input plain-textarea" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="ما الذي يجعل سيارتك خياراً مميزاً؟" maxLength={1200} /></label>
-            </div>
-          </div>
-
-          <div id="listing-step-3" hidden={step !== 3}>
-            <div className="form-section-heading"><span className="eyebrow eyebrow-green">أخيراً، الصورة تكملها</span><h2>خلّها تنشاف.</h2><p>ارفع حتى 6 صور واضحة للسيارة، ثم صورة خاصة لفريق المراجعة.</p></div>
+            <div className="form-section-heading"><span className="eyebrow eyebrow-green">الخطوة الثالثة · الصور والتواصل</span><h2>خلّها تنشاف.</h2><p>الصور الواضحة والتواصل السهل يساعدانك على البيع أسرع.</p></div>
+            <p className="upload-advice">أضف صورة من الأمام، الجوانب، والداخلية لبيع أسرع.</p>
             <label className="upload-dropzone">
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={compressing || busy} onChange={handleFiles} aria-label="اختر صور السيارة" />
               <span className="upload-icon"><ImagePlus aria-hidden="true" /></span>
               <strong>اسحب الصور هنا أو اخترها من جهازك</strong>
-              <small>حتى 6 صور · المحفوظ: {existingImages.length} · تُضغط الصور الجديدة تلقائياً إلى أقل من 500 كيلوبايت للصورة</small>
+              <small>حتى 8 صور · المحفوظ: {existingImages.length} · تُضغط الصور الجديدة تلقائياً إلى أقل من 500 كيلوبايت للصورة</small>
               <span className="upload-button"><Camera aria-hidden="true" /> اختيار الصور</span>
             </label>
             {(existingImages.length > 0 || previews.length > 0) && <div className="image-preview-grid">
@@ -365,6 +468,11 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
               {previews.map((preview, index) => <div className="image-preview" key={preview}><Image src={preview} alt={`معاينة صورة السيارة الجديدة ${index + 1}`} width={240} height={180} unoptimized /><button type="button" aria-label={`حذف الصورة الجديدة ${index + 1}`} onClick={() => removeImage(index)}><X aria-hidden="true" /></button></div>)}
             </div>}
             <div className="upload-privacy"><ShieldCheck aria-hidden="true" /><span>صور السيارة فقط ستظهر للمشترين بعد الموافقة على الإعلان.</span></div>
+            <div className="form-grid contact-fields">
+              <label className="form-field form-field-wide"><span>رقم واتساب للتواصل <small>مطلوب</small></span><input className="plain-input" type="tel" inputMode="tel" value={sellerPhone} onChange={(event) => setSellerPhone(event.target.value)} placeholder="+963 9XX XXX XXX" pattern="\+?[0-9\s()-]{8,20}" required /></label>
+              <label className="form-checkbox form-field-wide"><input type="checkbox" checked={whatsappOnly} onChange={(event) => setWhatsappOnly(event.target.checked)} /><span>التواصل عبر واتساب فقط</span></label>
+              <label className="form-field form-field-wide"><span>ملاحظات إضافية <small>اختياري</small></span><textarea className="plain-input plain-textarea" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="أضف أي تفاصيل تهم المشتري" maxLength={1200} /></label>
+            </div>
             <label className="upload-dropzone verification-upload">
               <input type="file" accept="image/jpeg,image/png,image/webp" disabled={compressing || busy} onChange={handleVerificationFile} aria-label="صورة التحقق وإثبات الجدية" required={!existingListing?.hasVerificationImage} />
               <span className="upload-icon"><ShieldCheck aria-hidden="true" /></span>
@@ -376,6 +484,7 @@ export function ListingWizard({ userId, userName, existingListing }: { userId: s
             {verificationPreview && <div className="verification-preview"><Image src={verificationPreview} alt="معاينة صورة التحقق التي ستظهر للإدارة فقط" width={480} height={320} unoptimized /><span>صورة خاصة بالإدارة فقط</span></div>}
             <div className="upload-privacy verification-privacy"><ShieldCheck aria-hidden="true" /><span>هذه الصورة لا تُنشر للعامة، ولا يطّلع عليها إلا فريق إدارة مَسَار للمراجعة.</span></div>
           </div>
+
 
           {error && <p className="form-alert wizard-alert" role="alert">{error}</p>}
           <div className="wizard-actions">

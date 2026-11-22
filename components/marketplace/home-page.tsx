@@ -48,12 +48,12 @@ function ListingCard({ car }: { car: HomeCar }) {
         </div>
         <div className="listing-badges" aria-label="معلومات السيارة">
           {car.verified && <span className="verified-pill"><BadgeCheck aria-hidden="true" /> موثق من مَسَار ✓</span>}
-          {(car.negotiationMin !== null || car.negotiationMax !== null) && <span className="listing-info-badge is-negotiable"><Tag aria-hidden="true" /> قابل للتفاوض</span>}
-          {car.transmission && <span className="listing-info-badge"><Cog aria-hidden="true" /> {car.transmission}</span>}
-          {car.paintCondition && <span className="listing-info-badge"><Paintbrush aria-hidden="true" /> {car.paintCondition}</span>}
+          {(car.negotiable || car.negotiationMin !== null || car.negotiationMax !== null) && <span className="listing-info-badge is-negotiable"><Tag aria-hidden="true" /> قابل للتفاوض</span>}
+          {car.transmission && <span className="listing-info-badge"><Cog aria-hidden="true" /> {car.transmission === 'automatic' ? 'أوتوماتيك' : car.transmission === 'manual' ? 'عادي' : car.transmission}</span>}
+          {car.paintCondition && <span className="listing-info-badge"><Paintbrush aria-hidden="true" /> {car.paintCondition === 'clean' ? 'دهان سليم' : car.paintCondition === 'interior' ? 'زنار' : car.paintCondition === 'panels' ? 'بخ قطعتين أو ثلاث' : car.paintCondition}</span>}
         </div>
         <div className="listing-meta">
-          <span><Gauge aria-hidden="true" />{money.format(car.mileage)} كم</span>
+          <span><Gauge aria-hidden="true" />{car.mileageUnknown ? 'العداد متوقف / لا أعلم' : `${money.format(car.mileage)} كم`}</span>
           <span><MapPin aria-hidden="true" />{car.city || 'سوريا'}</span>
         </div>
         <div className="listing-price-row">

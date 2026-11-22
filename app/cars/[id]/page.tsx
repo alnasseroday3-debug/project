@@ -35,6 +35,7 @@ export default async function CarPage({ params }: CarPageProps) {
     year: carListings.year,
     condition: carListings.condition,
     mileage: carListings.mileage,
+    mileageUnknown: carListings.mileageUnknown,
     usageMonths: carListings.usageMonths,
     maintenanceVisited: carListings.maintenanceVisited,
     maintenanceReason: carListings.maintenanceReason,
@@ -45,6 +46,13 @@ export default async function CarPage({ params }: CarPageProps) {
     askingPrice: carListings.askingPrice,
     negotiationMin: carListings.negotiationMin,
     negotiationMax: carListings.negotiationMax,
+    negotiable: carListings.negotiable,
+    paintCondition: carListings.paintCondition,
+    paintDetails: carListings.paintDetails,
+    transmission: carListings.transmission,
+    fuelType: carListings.fuelType,
+    registrationStatus: carListings.registrationStatus,
+    whatsappOnly: carListings.whatsappOnly,
     city: carListings.city,
     description: carListings.description,
     images: carListings.images,
@@ -83,10 +91,19 @@ export default async function CarPage({ params }: CarPageProps) {
             <span className="detail-year">{car.year}</span>
           </div>
           <div className="detail-specs">
-            <div><Gauge aria-hidden="true" /><span>الممشى</span><strong>{money.format(car.mileage)} كم</strong></div>
+            <div><Gauge aria-hidden="true" /><span>الممشى</span><strong>{car.mileageUnknown ? 'العداد متوقف / لا أعلم' : `${money.format(car.mileage)} كم`}</strong></div>
             <div><MapPin aria-hidden="true" /><span>الموقع</span><strong>{car.city || 'سوريا'}</strong></div>
             <div><CalendarDays aria-hidden="true" /><span>مدة الاستخدام</span><strong>{car.condition === 'new' ? 'جديدة' : `${car.usageMonths ?? 0} شهر`}</strong></div>
           </div>
+          <section className="detail-section detail-market-section" aria-label="مواصفات السيارة">
+            <h2>مواصفات السوق</h2>
+            <dl className="detail-market-grid">
+              <div><dt>حالة البخ (الدهان)</dt><dd>{car.paintCondition === 'clean' ? 'خالية العلام جوا وبرا' : car.paintCondition === 'interior' ? 'خالية من الداخل — زنار' : car.paintCondition === 'panels' ? 'بخ قطعتين أو ثلاث' : 'غير محددة'}</dd>{car.paintDetails && <small>{car.paintDetails}</small>}</div>
+              <div><dt>نوع الغيار</dt><dd>{car.transmission === 'automatic' ? 'أوتوماتيك' : car.transmission === 'manual' ? 'عادي' : 'غير محدد'}</dd></div>
+              <div><dt>نوع الوقود</dt><dd>{car.fuelType === 'gasoline' ? 'بنزين' : car.fuelType === 'diesel' ? 'مازوت' : car.fuelType === 'hybrid' ? 'هايبرد' : car.fuelType === 'electric' ? 'كهرباء' : 'غير محدد'}</dd></div>
+              <div><dt>حالة الأوراق والنمرة</dt><dd>{car.registrationStatus === 'syrian' ? 'نمرة سورية نظامية' : car.registrationStatus === 'new-entry' ? 'إدخال جديد' : car.registrationStatus === 'customs-cleared' ? 'مجمركة' : car.registrationStatus === 'immediate-transfer' ? 'فراغ فوري' : 'غير محددة'}</dd></div>
+            </dl>
+          </section>
           <section className="detail-section">
             <h2>عن السيارة</h2>
             <p>{car.description || 'تفاصيل السيارة متوفرة مباشرة من المعلن.'}</p>
@@ -105,9 +122,10 @@ export default async function CarPage({ params }: CarPageProps) {
           <div className="price-card">
             <span className="eyebrow eyebrow-green">السعر المطلوب</span>
             <p className="detail-price" dir="ltr"><strong>${money.format(car.askingPrice)}</strong></p>
-            {(car.negotiationMin || car.negotiationMax) && <p className="negotiation-note">قابل للتفاوض <span dir="ltr">{car.negotiationMin ? `$${money.format(car.negotiationMin)}` : ''}{car.negotiationMin && car.negotiationMax ? ' — ' : ''}{car.negotiationMax ? `$${money.format(car.negotiationMax)}` : ''}</span></p>}
+            {(car.negotiable || car.negotiationMin || car.negotiationMax) && <p className="negotiation-note">قابل للتفاوض <span dir="ltr">{car.negotiationMin ? `$${money.format(car.negotiationMin)}` : ''}{car.negotiationMin && car.negotiationMax ? ' — ' : ''}{car.negotiationMax ? `$${money.format(car.negotiationMax)}` : ''}</span></p>}
             {whatsappNumber ? <a className="whatsapp-button" href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer"><Phone aria-hidden="true" /> تواصل عبر واتساب</a> : <button className="whatsapp-button" type="button" disabled><Phone aria-hidden="true" /> رقم التواصل غير متوفر</button>}
-            {phone && <a className="phone-button" href={`tel:${phone}`}><Phone aria-hidden="true" /> اتصال هاتفي</a>}
+            {phone && !car.whatsappOnly && <a className="phone-button" href={`tel:${phone}`}><Phone aria-hidden="true" /> اتصال هاتفي</a>}
+            {car.whatsappOnly && <p className="whatsapp-only-note">التواصل عبر واتساب فقط</p>}
             <p className="secure-note"><BadgeCheck aria-hidden="true" /> الإعلان تمت مراجعته من فريق مَسَار</p>
           </div>
           <div className="seller-card"><span className="seller-avatar">{car.sellerName?.slice(0, 1) || 'م'}</span><div><span>المعلن</span><strong>{car.sellerName || 'معلن مَسَار'}</strong>{car.verified && <span className="seller-verified">موثق من مَسَار ✓</span>}</div>{car.verified && <BadgeCheck aria-label="إعلان موثق من مَسَار" />}</div>

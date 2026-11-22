@@ -84,6 +84,7 @@ export const carListings = pgTable('car_listings', {
   year: integer('year').notNull(),
   condition: text('condition').notNull(),
   mileage: integer('mileage').notNull().default(0),
+  mileageUnknown: boolean('mileageUnknown').notNull().default(false),
   usageMonths: integer('usageMonths'),
   maintenanceVisited: boolean('maintenanceVisited').notNull().default(false),
   maintenanceReason: text('maintenanceReason'),
@@ -94,6 +95,13 @@ export const carListings = pgTable('car_listings', {
   askingPrice: integer('askingPrice').notNull(),
   negotiationMin: integer('negotiationMin'),
   negotiationMax: integer('negotiationMax'),
+  negotiable: boolean('negotiable').notNull().default(false),
+  paintCondition: text('paintCondition'),
+  paintDetails: text('paintDetails'),
+  transmission: text('transmission'),
+  fuelType: text('fuelType'),
+  registrationStatus: text('registrationStatus'),
+  whatsappOnly: boolean('whatsappOnly').notNull().default(false),
   city: text('city'),
   description: text('description'),
   images: jsonb('images').$type<string[]>().notNull().default([]),
@@ -114,5 +122,5 @@ export const rateLimits = pgTable('rate_limits', {
 })
 
 export type CarListing = typeof carListings.$inferSelect
-export type PublicCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'mileage' | 'askingPrice' | 'city' | 'images' | 'verified'>
+export type PublicCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'mileage' | 'mileageUnknown' | 'askingPrice' | 'negotiable' | 'city' | 'images' | 'verified'>
 export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'askingPrice' | 'status' | 'images' | 'rejectionReason'>

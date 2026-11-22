@@ -29,6 +29,22 @@ export async function PATCH(request: NextRequest) {
     const verified = values.verified === true
     const rejectionReason = typeof values.rejectionReason === 'string' ? values.rejectionReason : ''
 
+    if (values.action === 'archive-pending') {
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })
+      const archived = await db.update(carListings)
+        .set({ status: 'archived', updatedAt: new Date() })
+        .where(and(eq(carListings.id, id), eq(carListings.status, 'pending')))
+        .returning({ id: carListings.id })
+      if (archived.length === 0) {
+        return NextResponse.json({ success: false, message: 'هذا الإعلان لم يعد قيد المراجعة.' }, { status: 409 })
+      }
+      revalidatePath('/')
+      revalidatePath('/admin')
+      revalidatePath('/my-listings')
+      revalidatePath(`/cars/${id}`)
+      return NextResponse.json({ success: true, message: 'تم حذف الطلب وأرشفته دون إرساله إلى المعلن.' })
+    }
+
     if (values.action === 'archive' || values.action === 'republish') {
       if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })
       const archiving = values.action === 'archive'
