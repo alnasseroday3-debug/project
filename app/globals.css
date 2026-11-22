@@ -32,33 +32,33 @@
 }
 
 :root {
-  color-scheme: light;
-  --background: #e5e7eb;
-  --foreground: #202a33;
-  --card: #f3f5f6;
-  --card-foreground: #202a33;
-  --popover: #f3f5f6;
-  --popover-foreground: #202a33;
-  --primary: #078052;
-  --primary-foreground: #ffffff;
-  --secondary: #dce5e1;
-  --secondary-foreground: #075e43;
-  --muted: #e9edf0;
-  --muted-foreground: #5d6872;
-  --accent: #d6e8df;
-  --accent-foreground: #075e43;
+  color-scheme: dark;
+  --background: #0A0A0B;
+  --foreground: #FFFFFF;
+  --card: #141416;
+  --card-foreground: #FFFFFF;
+  --popover: #141416;
+  --popover-foreground: #FFFFFF;
+  --primary: #10B981;
+  --primary-foreground: #FFFFFF;
+  --secondary: #202023;
+  --secondary-foreground: #A1A1AA;
+  --muted: #202023;
+  --muted-foreground: #A1A1AA;
+  --accent: #1c2e28;
+  --accent-foreground: #10B981;
   --destructive: #b13b34;
-  --border: #cfd5da;
-  --input: #d7dce0;
-  --ring: #64a987;
+  --border: #27272A;
+  --input: #27272A;
+  --ring: #10B981;
   --radius: 1rem;
-  --ink: #202a33;
-  --forest: #078052;
-  --forest-deep: #065f46;
-  --sage: #dce5e1;
-  --paper: #e5e7eb;
-  --line: #cfd5da;
-  --muted-ink: #5d6872;
+  --ink: #FFFFFF;
+  --forest: #10B981;
+  --forest-deep: #059669;
+  --sage: #202023;
+  --paper: #0A0A0B;
+  --line: #27272A;
+  --muted-ink: #A1A1AA;
 }
 
 * { box-sizing: border-box; }
@@ -851,4 +851,549 @@ select.plain-input { appearance: auto; }
   .support-dialog-actions { flex-direction: column-reverse; }
   .support-dialog-actions button { width: 100%; }
   .support-ticket-card { padding: 14px; }
+}
+
+/* Dark Luxury palette */
+body {
+  background: #0A0A0B;
+  color: #FFFFFF;
+}
+
+.site-header,
+.site-nav,
+.auth-page,
+.auth-panel,
+.price-card,
+.seller-card,
+.wizard-steps,
+.wizard-form,
+.submission-success,
+.admin-count,
+.admin-card,
+.my-listing-card,
+.listing-card,
+.support-dialog,
+.support-ticket-card {
+  background-color: #141416;
+}
+
+.hero-section,
+.sell-banner,
+.site-footer {
+  background-color: #141416;
+}
+
+.hero-copy h1,
+.section-heading h2,
+.trust-strip strong,
+.listing-title-row h3,
+.listing-price,
+.sell-banner h2,
+.footer-title,
+.auth-form-wrap h2,
+.detail-title-block h1,
+.detail-section h2,
+.inspection-card h3,
+.inspection-details p,
+.detail-specs strong,
+.seller-card > div strong,
+.wizard-heading h1,
+.form-section-heading h2,
+.submission-success h1,
+.admin-heading h1,
+.admin-card-title h2,
+.admin-empty h2,
+.admin-record-details h3,
+.admin-record-details dd,
+.my-listings-heading h1,
+.my-listing-content h2,
+.my-listing-price,
+.listing-action-form h2,
+.listing-delete-content h2,
+.support-dialog-heading h2,
+.support-ticket-card h2,
+.support-ticket-phone bdi {
+  color: #FFFFFF;
+}
+
+.eyebrow,
+.hero-copy > p,
+.hero-proof,
+.trust-strip small,
+.trust-strip .trust-note,
+.section-heading p,
+.listing-make,
+.listing-year,
+.listing-meta,
+.listing-price span,
+.footer-brand p,
+.footer-links,
+.footer-location,
+.footer-bottom,
+.auth-back,
+.auth-kicker,
+.auth-intro,
+.form-field,
+.form-field small,
+.field-help,
+.auth-switch,
+.auth-legal,
+.detail-breadcrumb,
+.detail-specs span,
+.detail-section > p,
+.report-row,
+.report-note,
+.inspection-caption,
+.detail-price span,
+.negotiation-note,
+.secure-note,
+.seller-card > div span,
+.back-link,
+.wizard-breadcrumb,
+.wizard-heading p,
+.wizard-step,
+.wizard-step small,
+.wizard-form-top,
+.draft-save-note,
+.form-section-heading p,
+.upload-privacy,
+.wizard-back,
+.wizard-bottom-note,
+.submission-success p,
+.admin-back,
+.admin-heading p,
+.admin-count small,
+.admin-card-title h2 small,
+.admin-description,
+.admin-facts,
+.admin-record-details > p,
+.admin-record-details dt,
+.admin-verification-content > span,
+.admin-verification-missing,
+.admin-verified-toggle,
+.my-listings-heading p,
+.my-listing-year,
+.my-listing-note,
+.my-listing-content .listing-make,
+.listing-action-form > p,
+.listing-delete-content p,
+.support-dialog-heading p,
+.support-field,
+.support-field small,
+.support-privacy-note,
+.support-ticket-category,
+.support-ticket-date,
+.support-ticket-phone,
+.support-ticket-message,
+.support-ticket-actions {
+  color: #A1A1AA;
+}
+
+.primary-button,
+.banner-button,
+.whatsapp-button,
+.review-approve,
+.support-launch,
+.support-submit,
+.support-whatsapp-reply,
+.my-listing-edit {
+  border-color: #10B981;
+  background-color: #10B981;
+  color: #FFFFFF;
+}
+
+.primary-button:hover,
+.banner-button:hover,
+.whatsapp-button:hover,
+.support-launch:hover,
+.support-submit:hover,
+.support-whatsapp-reply:hover,
+.my-listing-edit:hover {
+  border-color: #059669;
+  background-color: #059669;
+  color: #FFFFFF;
+}
+
+.verified-pill,
+.seller-verified,
+.admin-verification-content,
+.admin-whatsapp,
+.existing-verification-note {
+  border-color: rgba(16, 185, 129, .34);
+  background-color: rgba(16, 185, 129, .12);
+  color: #10B981;
+}
+
+.verified-pill svg,
+.detail-specs svg,
+.trust-strip > div > svg,
+.trust-strip .trust-note svg,
+.listing-meta svg,
+.secure-note svg,
+.seller-card > svg,
+.wizard-trust svg,
+.wizard-bottom-note svg {
+  color: #10B981;
+}
+
+.filter-bar,
+.brand-filter-chip,
+.price-filter label,
+.input-shell,
+.plain-input,
+.upload-dropzone,
+.upload-button,
+.verification-preview,
+.admin-tab,
+.admin-record-details dl > div,
+.admin-reject-dialog,
+.listing-action-dialog,
+.listing-delete-dialog,
+.support-success,
+.support-field input,
+.support-field select,
+.support-field textarea,
+.admin-reject-form textarea,
+.listing-action-summary,
+.listing-action-cancel,
+.listing-delete-cancel,
+.support-cancel,
+.support-dialog-close {
+  border-color: #27272A;
+  background-color: #141416;
+  color: #FFFFFF;
+}
+
+.filter-bar,
+.brand-filter-chip,
+.price-filter label,
+.input-shell,
+.plain-input,
+.upload-dropzone,
+.upload-button,
+.admin-tab,
+.admin-record-details dl > div,
+.admin-reject-dialog,
+.listing-action-dialog,
+.listing-delete-dialog,
+.support-dialog,
+.support-success,
+.support-ticket-card,
+.admin-card,
+.admin-count,
+.my-listing-card,
+.listing-card,
+.price-card,
+.seller-card,
+.wizard-steps,
+.wizard-form,
+.submission-success {
+  border-color: #27272A;
+}
+
+.search-box,
+.filter-bar,
+.detail-specs,
+.detail-specs > div,
+.report-row,
+.admin-review-actions,
+.admin-record-actions,
+.admin-record-details,
+.wizard-side-note,
+.wizard-actions,
+.support-ticket-actions,
+.listing-price-row {
+  border-color: #27272A;
+}
+
+.filter-chip,
+.result-count,
+.brand-filter-chip,
+.listing-info-badge,
+.text-link,
+.phone-button,
+.admin-tab,
+.admin-archive-action,
+.listing-action-cancel,
+.listing-delete-cancel,
+.support-cancel,
+.support-dialog-close {
+  color: #A1A1AA;
+}
+
+.filter-chip.is-selected,
+.brand-filter-chip:hover,
+.brand-filter-chip.is-selected,
+.admin-tab.is-active,
+.wizard-step.is-current,
+.detail-year,
+.inspection-icon,
+.inspection-badge.is-yes,
+.wizard-trust,
+.success-icon,
+.admin-empty > span,
+.admin-archive-action,
+.support-ticket-reference,
+.support-success-mark,
+.support-reference {
+  border-color: rgba(16, 185, 129, .35);
+  background-color: rgba(16, 185, 129, .12);
+  color: #10B981;
+}
+
+.listing-info-badge,
+.condition-badge,
+.admin-record-details dl > div,
+.listing-action-summary,
+.listing-action-cancel,
+.listing-delete-cancel,
+.support-cancel,
+.support-dialog-close {
+  border-color: #27272A;
+  background-color: #202023;
+  color: #A1A1AA;
+}
+
+.listing-make,
+.listing-year,
+.listing-meta,
+.detail-specs span,
+.price-filter,
+.search-box,
+.result-count,
+.empty-results,
+.wizard-form-top,
+.admin-record-details dt {
+  color: #A1A1AA;
+}
+
+.listing-card:hover {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, .38);
+}
+
+.hero-bottom-note {
+  border-color: #27272A;
+  color: #A1A1AA;
+}
+
+.hero-bottom-note span:first-child,
+.hero-copy h1 span,
+.section-heading h2 span,
+.nav-link:hover,
+.nav-link.is-active,
+.nav-login,
+.nav-signout,
+.hero-secondary,
+.all-listings-link,
+.text-link,
+.auth-switch a,
+.detail-breadcrumb a,
+.phone-button,
+.my-listing-link,
+.quiet-link {
+  color: #10B981;
+}
+
+.wordmark {
+  color: #FFFFFF;
+}
+
+.wordmark-icon {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.nav-link,
+.nav-greeting,
+.footer-links,
+.footer-location,
+.back-link,
+.wizard-back,
+.admin-back {
+  color: #A1A1AA;
+}
+
+.site-header {
+  border-bottom-color: #27272A;
+}
+
+.site-footer {
+  border-top-color: #27272A;
+}
+
+.nav-listings-badge,
+.condition-badge,
+.proof-avatars i {
+  border-color: #27272A;
+  background: #202023;
+  color: #A1A1AA;
+}
+
+.search-box input,
+.price-filter input,
+.input-shell input,
+.plain-input,
+.support-field input,
+.support-field select,
+.support-field textarea,
+.admin-reject-form textarea {
+  background-color: transparent;
+  color: #FFFFFF;
+}
+
+.search-box input::placeholder,
+.price-filter input::placeholder,
+.input-shell input::placeholder,
+.plain-input::placeholder,
+.support-field input::placeholder,
+.support-field textarea::placeholder {
+  color: #71717A;
+}
+
+.filter-bar input:focus,
+.input-shell:focus-within,
+.plain-input:focus,
+.support-field input:focus,
+.support-field select:focus,
+.support-field textarea:focus {
+  border-color: #10B981;
+}
+
+.empty-results,
+.my-listings-empty,
+.admin-empty {
+  border-color: #27272A;
+  background: #141416;
+  color: #A1A1AA;
+}
+
+.sell-banner-mark,
+.seller-avatar,
+.note-spark,
+.upload-icon,
+.listing-action-icon,
+.listing-delete-icon,
+.admin-empty > span,
+.support-success-mark {
+  border-color: #27272A;
+  background-color: #202023;
+}
+
+.my-listing-status.is-approved,
+.inspection-badge.is-yes,
+.pending-pill.is-published {
+  background-color: rgba(16, 185, 129, .14);
+  color: #10B981;
+}
+
+.support-dialog,
+.admin-reject-dialog,
+.listing-action-dialog,
+.listing-delete-dialog {
+  border-color: #27272A;
+  background-color: #141416;
+  color: #FFFFFF;
+}
+
+.admin-reject-form label,
+.admin-reject-form h2,
+.admin-record-details h3,
+.admin-record-details dd,
+.support-success h3,
+.support-ticket-card h2 {
+  color: #FFFFFF;
+}
+
+.hero-proof strong {
+  color: #FFFFFF;
+}
+
+.listing-image-link,
+.detail-photo-wrap,
+.my-listing-photo,
+.admin-card-photo,
+.image-preview,
+.admin-record-gallery img {
+  background-color: #202023;
+}
+
+.image-arrow {
+  border: 1px solid #27272A;
+  background-color: #202023;
+  color: #10B981;
+}
+
+.listing-info-badge.is-negotiable {
+  border-color: #4a3d2b;
+  background-color: #241f18;
+  color: #d6b98a;
+}
+
+.form-alert,
+.support-error,
+.my-listing-rejection {
+  border-color: #5a2a2a;
+  background-color: #241616;
+  color: #fca5a5;
+}
+
+.form-success,
+.my-listings-feedback,
+.existing-verification-note,
+.admin-verification,
+.admin-whatsapp {
+  border-color: rgba(16, 185, 129, .3);
+  background-color: rgba(16, 185, 129, .1);
+  color: #10B981;
+}
+
+.my-listing-rejection strong,
+.my-listing-rejection p {
+  color: #fca5a5;
+}
+
+.admin-reject-cancel,
+.admin-archive-action,
+.admin-permanent-delete,
+.my-listing-remove,
+.my-listing-delete,
+.listing-action-cancel,
+.listing-delete-cancel,
+.support-cancel {
+  border-color: #27272A;
+  background-color: #202023;
+  color: #A1A1AA;
+}
+
+.admin-permanent-delete,
+.my-listing-remove,
+.my-listing-delete {
+  border-color: #5a2a2a;
+  background-color: #241616;
+  color: #fca5a5;
+}
+
+.admin-permanent-delete:hover,
+.my-listing-remove:hover,
+.my-listing-delete:hover {
+  border-color: #7f3030;
+  background-color: #321919;
+  color: #fecaca;
+}
+
+.pending-pill,
+.pending-pill.is-archived,
+.my-listing-status.is-pending {
+  background-color: #28231a;
+  color: #d6b98a;
+}
+
+.my-listing-status.is-rejected {
+  background-color: #2b1717;
+  color: #fca5a5;
+}
+
+.inspection-badge.is-no {
+  background-color: #202023;
+  color: #A1A1AA;
 }
