@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, or } from 'drizzle-orm'
+import { and, desc, eq, ne, or, sql } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { MyListings } from '@/components/marketplace/my-listings'
 import { getCurrentSession } from '@/lib/auth-helpers'
@@ -27,6 +27,8 @@ export default async function MyListingsPage() {
       archivedByAdmin: carListings.archivedByAdmin,
       archivedByExpiry: carListings.archivedByExpiry,
       hiddenByOwner: carListings.hiddenByOwner,
+      publishedAt: carListings.publishedAt,
+      createdAt: carListings.createdAt,
     })
     .from(carListings)
     .where(and(
@@ -34,7 +36,7 @@ export default async function MyListingsPage() {
       eq(carListings.hiddenByOwner, false),
       or(ne(carListings.status, 'archived'), eq(carListings.archivedByAdmin, true), eq(carListings.archivedByExpiry, true)),
     ))
-    .orderBy(desc(carListings.createdAt))
+    .orderBy(desc(sql`COALESCE(${carListings.publishedAt}, ${carListings.createdAt})`))
 
   return <MyListings listings={listings} />
 }

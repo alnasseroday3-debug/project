@@ -166,7 +166,7 @@ export async function removeOwnedListing(listingId: string) {
     if (listing.status === 'approved') {
       const archived = await db
         .update(carListings)
-        .set({ status: 'archived', archivedByAdmin: false, archivedByExpiry: false, updatedAt: new Date() })
+        .set({ status: 'archived', archivedByAdmin: false, archivedByExpiry: false, hiddenByOwner: true, updatedAt: new Date() })
         .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'approved')))
         .returning({ id: carListings.id })
       if (!archived.length) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }
@@ -174,13 +174,13 @@ export async function removeOwnedListing(listingId: string) {
       revalidatePath('/admin')
       revalidatePath('/my-listings')
       revalidatePath(`/cars/${listingId}`)
-      return { success: true, message: 'تمت إزالة الإعلان من العرض ونقله إلى أرشيف الإدارة.' }
+      return { success: true, message: 'تمت إزالة الإعلان من العرض وحُفظ في أرشيف الإدارة.' }
     }
 
     if (listing.status === 'archived' && listing.archivedByExpiry) {
       const archived = await db
         .update(carListings)
-        .set({ archivedByExpiry: false, updatedAt: new Date() })
+        .set({ archivedByExpiry: false, hiddenByOwner: true, updatedAt: new Date() })
         .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'archived'), eq(carListings.archivedByExpiry, true)))
         .returning({ id: carListings.id })
       if (!archived.length) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }

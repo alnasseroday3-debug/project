@@ -160,6 +160,9 @@ img { display: block; max-width: 100%; }
 .search-box input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 13px; }
 .search-box input::placeholder { color: #a0a39a; }
 .filter-tabs { display: flex; align-items: center; gap: 4px; }
+.publication-filter { min-height: 38px; display: flex; align-items: center; gap: 8px; border-inline-start: 1px solid #e8e7e1; padding-inline-start: 12px; color: #767c74; font-size: 11px; white-space: nowrap; }
+.publication-filter select { max-width: 125px; border: 1px solid #e6e5df; border-radius: 7px; padding: 8px 10px; background: #f3f5f6; color: var(--ink); font: inherit; font-size: 11px; }
+.publication-filter select:focus-visible { outline: 2px solid #10B981; outline-offset: 2px; }
 .filter-chip { min-height: 35px; border: 0; border-radius: 8px; padding: 0 13px; background: transparent; color: #767c74; font-size: 12px; cursor: pointer; }
 .filter-chip.is-selected { background: #e8eee7; color: var(--forest); font-weight: 700; }
 .price-filter { display: flex; align-items: center; gap: 7px; min-width: 0; margin: 0; border: 0; padding: 0; color: #899087; }
@@ -181,6 +184,7 @@ img { display: block; max-width: 100%; }
 .listing-image { width: 100%; height: 100%; object-fit: cover; transition: transform .45s ease; }
 .listing-card:hover .listing-image { transform: scale(1.035); }
 .condition-badge { position: absolute; top: 13px; inset-inline-start: 13px; padding: 4px 10px; border: 1px solid rgba(255,255,255,.6); border-radius: 6px; background: rgba(255,254,250,.92); color: #34483c; font-size: 10px; font-weight: 700; }
+.listing-age-badge { position: absolute; top: 13px; inset-inline-end: 13px; z-index: 1; border: 1px solid rgba(16,185,129,.28); border-radius: 999px; padding: 5px 9px; background: rgba(10,10,11,.86); color: #A7F3D0; font-size: 10px; font-weight: 700; line-height: 1; backdrop-filter: blur(8px); }
 .image-arrow { position: absolute; right: 12px; bottom: 12px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(255,254,250,.9); color: var(--forest); opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s; }
 .listing-card:hover .image-arrow { opacity: 1; transform: translateY(0); }
 .image-arrow svg { width: 15px; height: 15px; }
@@ -494,6 +498,8 @@ select.plain-input { appearance: auto; }
 .admin-tab.is-active > span { background: rgba(255,255,255,.2); }
 .pending-pill.is-published { background: #dff0e2; color: #276442; }
 .pending-pill.is-archived { background: #f0e9dc; color: #806b4a; }
+.archive-source-badge { width: fit-content; display: inline-flex; margin-top: 9px; border: 1px solid #3F3F46; border-radius: 7px; padding: 6px 9px; background: #202023; color: #D4D4D8; font-size: 10px; font-weight: 700; line-height: 1.5; }
+.archive-source-badge.is-seller-archive { border-color: rgba(245,158,11,.28); background: rgba(120,74,12,.16); color: #FCD34D; }
 .admin-record-details { margin-top: 15px; border-top: 1px solid #e8e9e2; padding-top: 12px; }
 .admin-record-details h3 { margin: 0 0 7px; color: #405345; font-size: 12px; }
 .admin-record-details > p { margin: 0 0 11px; color: #6f7970; font-size: 11px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -523,7 +529,7 @@ select.plain-input { appearance: auto; }
 .my-listings-heading p { margin: 0; color: #66727b; font-size: 13px; }
 .my-listings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .my-listing-card { overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: #f3f5f6; }
-.my-listing-photo { height: 190px; overflow: hidden; background: #d8dee2; }
+.my-listing-photo { position: relative; height: 190px; overflow: hidden; background: #d8dee2; }
 .my-listing-photo img { width: 100%; height: 100%; object-fit: cover; }
 .my-listing-content { padding: 15px; }
 .my-listing-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -680,6 +686,7 @@ select.plain-input { appearance: auto; }
   .section-heading p { max-width: 240px; font-size: 10px; }
   .all-listings-link { margin-top: 25px; font-size: 11px; white-space: nowrap; }
   .filter-bar { flex-wrap: wrap; gap: 8px; padding: 9px; }
+  .publication-filter { border-inline-start: 0; padding-inline-start: 0; }
   .price-filter { flex: 1 1 175px; }
   .price-filter label { flex: 1; width: auto; }
   .search-box { flex-basis: 100%; border-inline-end: 0; border-bottom: 1px solid #eeede8; }
@@ -1077,6 +1084,7 @@ body {
 .filter-bar,
 .brand-filter-chip,
 .price-filter label,
+.publication-filter select,
 .input-shell,
 .plain-input,
 .upload-dropzone,

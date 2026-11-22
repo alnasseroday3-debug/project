@@ -24,11 +24,11 @@ export default async function Page() {
       city: carListings.city,
       images: carListings.images,
       verified: carListings.verified,
+      publishedAt: carListings.publishedAt,
     })
     .from(carListings)
     .where(and(eq(carListings.status, 'approved'), gt(carListings.expiresAt, new Date())))
     .orderBy(desc(carListings.publishedAt))
-    .limit(24)
 
   return <HomePage cars={cars} />
 }

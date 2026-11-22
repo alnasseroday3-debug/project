@@ -47,6 +47,11 @@ export async function PATCH(request: NextRequest) {
 
     if (values.action === 'restore-pending') {
       if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })
+      const [archivedListing] = await db.select({ archivedByAdmin: carListings.archivedByAdmin, archivedByExpiry: carListings.archivedByExpiry })
+        .from(carListings).where(and(eq(carListings.id, id), eq(carListings.status, 'archived'))).limit(1)
+      if (archivedListing && !archivedListing.archivedByAdmin && !archivedListing.archivedByExpiry) {
+        return NextResponse.json({ success: false, message: 'لا يمكن إعادة إعلان أزاله صاحبه إلى قائمة المراجعة.' }, { status: 409 })
+      }
       const updated = await db.update(carListings)
         .set({ status: 'pending', rejectionReason: null, publishedAt: null, expiresAt: null, archivedByAdmin: false, archivedByExpiry: false, hiddenByOwner: false, updatedAt: new Date() })
         .where(and(eq(carListings.id, id), eq(carListings.status, 'archived')))
@@ -61,6 +66,13 @@ export async function PATCH(request: NextRequest) {
 
     if (values.action === 'archive' || values.action === 'republish') {
       if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })
+      if (values.action === 'republish') {
+        const [archivedListing] = await db.select({ archivedByAdmin: carListings.archivedByAdmin, archivedByExpiry: carListings.archivedByExpiry })
+          .from(carListings).where(and(eq(carListings.id, id), eq(carListings.status, 'archived'))).limit(1)
+        if (archivedListing && !archivedListing.archivedByAdmin && !archivedListing.archivedByExpiry) {
+          return NextResponse.json({ success: false, message: 'لا يمكن إعادة نشر إعلان أزاله صاحبه من السوق.' }, { status: 409 })
+        }
+      }
       const archiving = values.action === 'archive'
       const now = new Date()
       const updated = await db.update(carListings)
@@ -82,6 +94,13 @@ export async function PATCH(request: NextRequest) {
     const sourceStatus = values.sourceStatus === 'archived' ? 'archived' : 'pending'
     if (!id || (status !== 'approved' && status !== 'rejected') || typeof values.verified !== 'boolean' || (sourceStatus === 'archived' && status !== 'rejected')) {
       return NextResponse.json({ success: false, message: 'بيانات المراجعة غير صالحة.' }, { status: 400 })
+    }
+    if (sourceStatus === 'archived') {
+      const [archivedListing] = await db.select({ archivedByAdmin: carListings.archivedByAdmin, archivedByExpiry: carListings.archivedByExpiry })
+        .from(carListings).where(and(eq(carListings.id, id), eq(carListings.status, 'archived'))).limit(1)
+      if (archivedListing && !archivedListing.archivedByAdmin && !archivedListing.archivedByExpiry) {
+        return NextResponse.json({ success: false, message: 'لا يمكن مراجعة إعلان أزاله صاحبه من السوق.' }, { status: 409 })
+      }
     }
     if (status === 'rejected' && (!rejectionReason.trim() || rejectionReason.length > 2000)) {
       return NextResponse.json({ success: false, message: 'اكتب سبب الرفض، بحد أقصى 2000 حرف.' }, { status: 400 })
@@ -127,12 +146,12 @@ export async function DELETE(request: NextRequest) {
     const [listing] = await db.select({ id: carListings.id, status: carListings.status, userId: carListings.userId, images: carListings.images, verificationImage: carListings.verificationImage })
       .from(carListings).where(eq(carListings.id, id)).limit(1)
     if (!listing) return NextResponse.json({ success: false, message: 'الإعلان غير موجود.' }, { status: 404 })
-    if (listing.status !== 'archived') {
-      return NextResponse.json({ success: false, message: 'انقل الإعلان إلى الأرشيف قبل حذفه نهائياً.' }, { status: 409 })
+    if (listing.status !== 'archived' && listing.status !== 'approved') {
+      return NextResponse.json({ success: false, message: 'يمكن حذف الإعلانات المنشورة أو المؤرشفة نهائياً.' }, { status: 409 })
     }
 
     const deleted = await db.delete(carListings)
-      .where(and(eq(carListings.id, listing.id), eq(carListings.status, 'archived')))
+      .where(and(eq(carListings.id, listing.id), eq(carListings.status, listing.status)))
       .returning({ id: carListings.id })
     if (deleted.length === 0) return NextResponse.json({ success: false, message: 'تغيرت بيانات الإعلان. حدّث الصفحة وحاول مجدداً.' }, { status: 409 })
 

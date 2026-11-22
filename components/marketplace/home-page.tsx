@@ -7,12 +7,14 @@ import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowUpLeft, BadgeCheck, CarFront, CircleHelp, Cog, Gauge, MapPin, Paintbrush, Search, ShieldCheck, SlidersHorizontal, Sparkles, Tag } from 'lucide-react'
 import type { PublicCarListing } from '@/lib/db/schema'
 import { carImageUrl } from '@/lib/car-image-url'
+import { listingAgeLabel } from '@/lib/listing-age'
 
 type HomeCar = PublicCarListing & {
   negotiationMin: number | null
   negotiationMax: number | null
   transmission?: string | null
   paintCondition?: string | null
+  publishedAt: Date | null
 }
 
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
@@ -36,6 +38,7 @@ function ListingCard({ car }: { car: HomeCar }) {
       <Link className="listing-image-link" href={`/cars/${car.id}`} aria-label={`عرض ${car.make} ${car.model}`}>
         <CarPhoto src={carImageUrl(car)} alt={`${car.make} ${car.model} ${car.year}`} width={720} height={480} className="listing-image" />
         <span className="condition-badge">{car.condition === 'new' ? 'جديدة' : 'مستعملة'}</span>
+        <span className="listing-age-badge">{listingAgeLabel(car.publishedAt)}</span>
         <span className="image-arrow"><ArrowUpLeft aria-hidden="true" /></span>
       </Link>
       <div className="listing-content">
@@ -69,6 +72,7 @@ export function HomePage({ cars }: { cars: HomeCar[] }) {
   const [query, setQuery] = useState('')
   const [condition, setCondition] = useState<'all' | 'new' | 'used'>('all')
   const [selectedBrand, setSelectedBrand] = useState<string>('all')
+  const [publicationPeriod, setPublicationPeriod] = useState<'all' | 'week' | 'month' | 'year'>('all')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const filteredCars = useMemo(() => {
@@ -76,16 +80,21 @@ export function HomePage({ cars }: { cars: HomeCar[] }) {
     const minimum = minPrice === '' ? null : Number(minPrice)
     const maximum = maxPrice === '' ? null : Number(maxPrice)
     const activeBrand = brands.find((brand) => brand.value === selectedBrand)
+    const publicationCutoff = new Date()
+    if (publicationPeriod === 'week') publicationCutoff.setDate(publicationCutoff.getDate() - 7)
+    if (publicationPeriod === 'month') publicationCutoff.setDate(publicationCutoff.getDate() - 30)
+    if (publicationPeriod === 'year') publicationCutoff.setFullYear(publicationCutoff.getFullYear() - 1)
     return cars.filter((car) => {
       const matchesCondition = condition === 'all' || car.condition === condition
       const matchesMinimum = minimum === null || car.askingPrice >= minimum
       const matchesMaximum = maximum === null || car.askingPrice <= maximum
+      const matchesPublicationPeriod = publicationPeriod === 'all' || Boolean(car.publishedAt && new Date(car.publishedAt) >= publicationCutoff)
       const normalizedMake = car.make.trim().toLocaleLowerCase('ar')
       const matchesBrand = selectedBrand === 'all' || Boolean(activeBrand?.aliases.some((alias) => normalizedMake === alias.toLocaleLowerCase('ar')))
       const searchable = `${car.make} ${car.model} ${car.year} ${car.city ?? ''}`.toLocaleLowerCase('ar')
-      return matchesCondition && matchesMinimum && matchesMaximum && matchesBrand && (!normalizedQuery || searchable.includes(normalizedQuery))
-    })
-  }, [cars, condition, maxPrice, minPrice, query, selectedBrand])
+      return matchesCondition && matchesMinimum && matchesMaximum && matchesPublicationPeriod && matchesBrand && (!normalizedQuery || searchable.includes(normalizedQuery))
+    }).sort((first, second) => new Date(second.publishedAt ?? 0).getTime() - new Date(first.publishedAt ?? 0).getTime())
+  }, [cars, condition, maxPrice, minPrice, publicationPeriod, query, selectedBrand])
 
   return (
     <main>
@@ -142,6 +151,15 @@ export function HomePage({ cars }: { cars: HomeCar[] }) {
                 <button key={value} type="button" className={condition === value ? 'filter-chip is-selected' : 'filter-chip'} onClick={() => setCondition(value)} aria-pressed={condition === value}>{label}</button>
               ))}
             </div>
+            <label className="publication-filter">
+              <span>تاريخ النشر</span>
+              <select value={publicationPeriod} onChange={(event) => setPublicationPeriod(event.target.value as typeof publicationPeriod)} aria-label="تصفية حسب تاريخ النشر">
+                <option value="all">الكل</option>
+                <option value="week">آخر أسبوع</option>
+                <option value="month">آخر شهر</option>
+                <option value="year">آخر سنة</option>
+              </select>
+            </label>
             <fieldset className="price-filter">
               <legend className="sr-only">نطاق السعر بالدولار الأمريكي</legend>
               <label><span className="sr-only">أقل سعر بالدولار</span><input aria-label="أقل سعر بالدولار" type="number" min="0" inputMode="numeric" placeholder="من $" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label>

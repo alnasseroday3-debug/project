@@ -7,6 +7,7 @@ import { Archive, ArrowLeft, BadgeCheck, Clock3, FileText, RefreshCw, Trash2, XC
 import { removeOwnedListing, renewOwnedListing } from '@/app/actions/listings'
 import { CarPhoto } from '@/components/marketplace/car-photo'
 import { carImageUrl } from '@/lib/car-image-url'
+import { listingAgeLabel } from '@/lib/listing-age'
 import type { OwnerCarListing } from '@/lib/db/schema'
 
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
@@ -116,7 +117,7 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
           const canRenew = (car.status === 'approved' && daysRemaining !== null && daysRemaining <= 5) || isExpiryArchived
           return (
             <article className="my-listing-card" key={car.id}>
-              <div className="my-listing-photo"><CarPhoto src={carImageUrl(car)} alt={`${car.make} ${car.model} ${car.year}`} width={720} height={480} /></div>
+              <div className="my-listing-photo"><CarPhoto src={carImageUrl(car)} alt={`${car.make} ${car.model} ${car.year}`} width={720} height={480} /><span className="listing-age-badge">{listingAgeLabel(car.publishedAt ?? car.createdAt)}</span></div>
               <div className="my-listing-content">
                 <div className="my-listing-top"><span className={`${status.className}${isAdminArchived ? ' is-admin-archived' : ''}`}><StatusIcon aria-hidden="true" />{isAdminArchived ? 'تمت أرشفة الإعلان وإيقافه من قِبل الإدارة' : status.label}</span><span className="my-listing-year">{car.year}</span></div>
                 <p className="listing-make">{car.make}</p>
@@ -124,7 +125,7 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
                 <p className="my-listing-price" dir="ltr">${money.format(car.askingPrice)} USD</p>
                 {isAdminArchived ? <>
                   <section className="my-listing-admin-archive" aria-label="معلومات أرشفة الإدارة">
-                    <p>تم إيقاف هذا الإعلان إدارياً لعدم مطابقته شروط النشر أو لتكراره. يمكنك حذفه من قائمتك أو التواصل مع الإدارة للاستفسار.</p>
+                    <p>تمت أرشفة هذا الإعلان وإيقافه من قِبل الإدارة — راجع الإدارة إذا أردت الاستفسار.</p>
                   </section>
                   <button type="button" className="my-listing-delete" disabled={isDeleting} onClick={() => setConfirmingListing(car)}><Trash2 aria-hidden="true" />حذف من قائمتي</button>
                 </> : isExpiryArchived ? <>
@@ -167,7 +168,7 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
             : confirmingListing?.status === 'approved'
               ? 'سيختفي الإعلان فوراً عن الزوار، وسيُحفظ في أرشيف الإدارة. لن تتمكن من إعادته إلى العرض.'
               : confirmingListing?.status === 'archived'
-                ? 'سيُزال الإعلان المنتهي من قائمتك ويُحفظ في أرشيف الإدارة.'
+                ? 'سيُخفى الإعلان من قائمتك فقط، وسيظل محفوظاً في أرشيف الإدارة.'
                 : confirmingListing?.status === 'pending'
                   ? 'سيُلغى طلب المراجعة ويُحذف الإعلان وصوره نهائياً من حسابك.'
                   : 'سيُحذف الإعلان المرفوض وصوره نهائياً، ولا يمكن التراجع عن هذا الإجراء.'}</p>

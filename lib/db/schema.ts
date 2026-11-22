@@ -129,4 +129,4 @@ export const rateLimits = pgTable('rate_limits', {
 
 export type CarListing = typeof carListings.$inferSelect
 export type PublicCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'mileage' | 'mileageUnknown' | 'askingPrice' | 'negotiable' | 'city' | 'images' | 'verified'>
-export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'askingPrice' | 'status' | 'images' | 'rejectionReason' | 'expiresAt' | 'directRenewals' | 'archivedByAdmin' | 'archivedByExpiry' | 'hiddenByOwner'>
+export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'askingPrice' | 'status' | 'images' | 'rejectionReason' | 'expiresAt' | 'directRenewals' | 'archivedByAdmin' | 'archivedByExpiry' | 'hiddenByOwner' | 'publishedAt' | 'createdAt'>

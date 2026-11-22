@@ -26,6 +26,7 @@ function AdminEmpty({ title, description }: { title: string; description: string
 }
 
 function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onReturnToPending, onReject, onDelete }: { car: CarListing; archived: boolean; disabled: boolean; onArchive: (car: CarListing) => void; onRepublish: (car: CarListing) => void; onReturnToPending: (car: CarListing) => void; onReject: (car: CarListing) => void; onDelete: (car: CarListing, archived: boolean) => void }) {
+  const isSellerArchived = archived && !car.archivedByAdmin && !car.archivedByExpiry
   const photos = car.images.map((image) => image.startsWith('http') || image.startsWith('/')
     ? image
     : `/api/car-images?listing=${encodeURIComponent(car.id)}&path=${encodeURIComponent(image)}`)
@@ -34,6 +35,7 @@ function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onRe
       <div className="admin-card-photo"><CarPhoto src={photos[0] || carImageUrl(car)} alt={`${car.make} ${car.model} ${car.year}`} width={520} height={360} /></div>
       <div className="admin-card-info">
         <div className="admin-card-title"><div><span className="listing-make">{car.make}</span><h2>{car.model} <small>{car.year}</small></h2></div><span className={`pending-pill ${archived ? 'is-archived' : 'is-published'}`}>{archived ? <Archive aria-hidden="true" /> : <BadgeCheck aria-hidden="true" />}{archived ? 'ضمن الأرشيف' : 'منشور حالياً'}</span></div>
+        {archived && <span className={`archive-source-badge${isSellerArchived ? ' is-seller-archive' : ''}`}>{isSellerArchived ? 'حُذف بواسطة البائع (تم البيع / أزاله صاحبه)' : car.archivedByAdmin ? 'مؤرشف إدارياً' : 'انتهت مدة العرض'}</span>}
         <p className="admin-description">{car.description || 'لا توجد نبذة عن السيارة.'}</p>
         <div className="admin-facts"><span dir="ltr">${money.format(car.askingPrice)} USD</span><span>{money.format(car.mileage)} كم</span><span><MapPin aria-hidden="true" /> {car.city || 'سوريا'}</span><span><BadgeCheck aria-hidden="true" /> {car.sellerName || 'معلن مَسَار'}</span>{car.sellerPhone && <a href={`tel:${car.sellerPhone}`} dir="ltr">{car.sellerPhone}</a>}</div>
         <dl className="admin-record-details">
@@ -47,12 +49,12 @@ function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onRe
         </dl>
         {photos.length > 1 && <div className="admin-record-gallery" aria-label="صور الإعلان">{photos.slice(1).map((src, index) => <CarPhoto key={`${car.id}-photo-${index}`} src={src} alt={`صورة ${index + 2} لإعلان ${car.make} ${car.model}`} width={180} height={120} />)}</div>}
         {car.verificationImage && <section className="admin-verification" aria-label="صورة التحقق الخاصة بالإدارة"><Image className="admin-verification-image" src={`/api/verification-image?listing=${encodeURIComponent(car.id)}`} alt={`صورة التحقق الخاصة بإعلان ${car.make} ${car.model}`} width={520} height={360} unoptimized /><div className="admin-verification-content"><strong>صورة التحقق وإثبات الجدية</strong><span>مرئية للإدارة فقط ولا تُنشر مع الإعلان.</span>{car.sellerPhone && <a className="admin-whatsapp" href={whatsappUrl(car.sellerPhone, car.make, car.model, car.year)} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden="true" /> مراسلة البائع عبر واتساب</a>}</div></section>}
-        <div className="admin-record-actions">{archived ? <>
+        <div className="admin-record-actions">{archived ? isSellerArchived ? <button type="button" className="admin-permanent-delete" disabled={disabled} onClick={() => onDelete(car, true)}><Trash2 aria-hidden="true" />حذف نهائي من الأرشيف</button> : <>
           <button type="button" className="review-approve" disabled={disabled} onClick={() => onRepublish(car)}><BadgeCheck aria-hidden="true" />إعادة نشر</button>
           <button type="button" className="admin-restore-action" disabled={disabled} onClick={() => onReturnToPending(car)}><Clock3 aria-hidden="true" />إرجاع لقيد المراجعة</button>
           <button type="button" className="review-reject" disabled={disabled} onClick={() => onReject(car)}><X aria-hidden="true" />رفض مع توضيح السبب</button>
           <button type="button" className="admin-permanent-delete" disabled={disabled} onClick={() => onDelete(car, true)}><Trash2 aria-hidden="true" />حذف نهائي</button>
-        </> : <><Link className="review-details" href={`/cars/${car.id}`} target="_blank" rel="noreferrer">تفاصيل الإعلان <ArrowUpLeft aria-hidden="true" /></Link><button type="button" className="admin-archive-action" disabled={disabled} onClick={() => onArchive(car)}><Archive aria-hidden="true" />نقل إلى الأرشيف</button></>}</div>
+        </> : <><Link className="review-details" href={`/cars/${car.id}`} target="_blank" rel="noreferrer">تفاصيل الإعلان <ArrowUpLeft aria-hidden="true" /></Link><button type="button" className="admin-archive-action" disabled={disabled} onClick={() => onArchive(car)}><Archive aria-hidden="true" />أرشفة إدارية (إيقاف مؤقت)</button><button type="button" className="admin-permanent-delete" disabled={disabled} onClick={() => onDelete(car, false)}><Trash2 aria-hidden="true" />حذف نهائي</button></>}</div>
       </div>
     </article>
   )
@@ -218,7 +220,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
         <nav className="admin-tabs" aria-label="أقسام الإدارة">
           <button type="button" aria-pressed={activeSection === 'pending'} className={activeSection === 'pending' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('pending')}><Clock3 aria-hidden="true" />طلبات المراجعة<span>{visiblePending.length}</span></button>
           <button type="button" aria-pressed={activeSection === 'published'} className={activeSection === 'published' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('published')}><BadgeCheck aria-hidden="true" />الإعلانات المنشورة<span>{visiblePublished.length}</span></button>
-          <button type="button" aria-pressed={activeSection === 'archived'} className={activeSection === 'archived' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('archived')}><Archive aria-hidden="true" />أرشيف الإعلانات المحذوفة / المباعة<span>{visibleArchived.length}</span></button>
+          <button type="button" aria-pressed={activeSection === 'archived'} className={activeSection === 'archived' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('archived')}><Archive aria-hidden="true" />أرشيف الإعلانات<span>{visibleArchived.length}</span></button>
           <button type="button" aria-pressed={activeSection === 'support'} className={activeSection === 'support' ? 'admin-tab is-active' : 'admin-tab'} onClick={() => setActiveSection('support')}><MessageCircle aria-hidden="true" />طلبات الدعم<span>{supportTickets.length}</span></button>
         </nav>
         {feedback && <p className="form-success admin-feedback" role="status">{feedback}</p>}
