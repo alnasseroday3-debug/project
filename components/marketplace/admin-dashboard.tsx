@@ -25,7 +25,7 @@ function AdminEmpty({ title, description }: { title: string; description: string
   return <section className="admin-empty"><span><Check aria-hidden="true" /></span><h2>{title}</h2><p>{description}</p></section>
 }
 
-function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onDelete }: { car: CarListing; archived: boolean; disabled: boolean; onArchive: (car: CarListing) => void; onRepublish: (car: CarListing) => void; onDelete: (car: CarListing, archived: boolean) => void }) {
+function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onReturnToPending, onReject, onDelete }: { car: CarListing; archived: boolean; disabled: boolean; onArchive: (car: CarListing) => void; onRepublish: (car: CarListing) => void; onReturnToPending: (car: CarListing) => void; onReject: (car: CarListing) => void; onDelete: (car: CarListing, archived: boolean) => void }) {
   const photos = car.images.map((image) => image.startsWith('http') || image.startsWith('/')
     ? image
     : `/api/car-images?listing=${encodeURIComponent(car.id)}&path=${encodeURIComponent(image)}`)
@@ -47,7 +47,12 @@ function AdminRecordCard({ car, archived, disabled, onArchive, onRepublish, onDe
         </dl>
         {photos.length > 1 && <div className="admin-record-gallery" aria-label="صور الإعلان">{photos.slice(1).map((src, index) => <CarPhoto key={`${car.id}-photo-${index}`} src={src} alt={`صورة ${index + 2} لإعلان ${car.make} ${car.model}`} width={180} height={120} />)}</div>}
         {car.verificationImage && <section className="admin-verification" aria-label="صورة التحقق الخاصة بالإدارة"><Image className="admin-verification-image" src={`/api/verification-image?listing=${encodeURIComponent(car.id)}`} alt={`صورة التحقق الخاصة بإعلان ${car.make} ${car.model}`} width={520} height={360} unoptimized /><div className="admin-verification-content"><strong>صورة التحقق وإثبات الجدية</strong><span>مرئية للإدارة فقط ولا تُنشر مع الإعلان.</span>{car.sellerPhone && <a className="admin-whatsapp" href={whatsappUrl(car.sellerPhone, car.make, car.model, car.year)} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden="true" /> مراسلة البائع عبر واتساب</a>}</div></section>}
-        <div className="admin-record-actions">{archived ? <><button type="button" className="review-approve" disabled={disabled} onClick={() => onRepublish(car)}><BadgeCheck aria-hidden="true" />إعادة نشر الإعلان</button><button type="button" className="review-reject" disabled={disabled} onClick={() => onDelete(car, true)}><Trash2 aria-hidden="true" />حذف نهائي من الأرشيف</button></> : <><Link className="review-details" href={`/cars/${car.id}`} target="_blank" rel="noreferrer">تفاصيل الإعلان <ArrowUpLeft aria-hidden="true" /></Link><button type="button" className="admin-archive-action" disabled={disabled} onClick={() => onArchive(car)}><Archive aria-hidden="true" />نقل إلى الأرشيف</button></>}</div>
+        <div className="admin-record-actions">{archived ? <>
+          <button type="button" className="review-approve" disabled={disabled} onClick={() => onRepublish(car)}><BadgeCheck aria-hidden="true" />إعادة نشر</button>
+          <button type="button" className="admin-restore-action" disabled={disabled} onClick={() => onReturnToPending(car)}><Clock3 aria-hidden="true" />إرجاع لقيد المراجعة</button>
+          <button type="button" className="review-reject" disabled={disabled} onClick={() => onReject(car)}><X aria-hidden="true" />رفض مع توضيح السبب</button>
+          <button type="button" className="admin-permanent-delete" disabled={disabled} onClick={() => onDelete(car, true)}><Trash2 aria-hidden="true" />حذف نهائي</button>
+        </> : <><Link className="review-details" href={`/cars/${car.id}`} target="_blank" rel="noreferrer">تفاصيل الإعلان <ArrowUpLeft aria-hidden="true" /></Link><button type="button" className="admin-archive-action" disabled={disabled} onClick={() => onArchive(car)}><Archive aria-hidden="true" />نقل إلى الأرشيف</button></>}</div>
       </div>
     </article>
   )
@@ -60,6 +65,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
   const [feedback, setFeedback] = useState('')
   const [verifiedSelections, setVerifiedSelections] = useState<Record<string, boolean>>({})
   const [rejectingId, setRejectingId] = useState('')
+  const [rejectingSourceStatus, setRejectingSourceStatus] = useState<'pending' | 'archived'>('pending')
   const [rejectionReason, setRejectionReason] = useState('')
   const [dialogError, setDialogError] = useState('')
   const [activeSection, setActiveSection] = useState<AdminSection>('pending')
@@ -86,13 +92,14 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
     if (!deleteTarget && dialog.open) dialog.close()
   }, [deleteTarget])
 
-  function openRejectDialog(id: string) {
+  function openRejectDialog(id: string, sourceStatus: 'pending' | 'archived' = 'pending') {
     setRejectingId(id)
+    setRejectingSourceStatus(sourceStatus)
     setRejectionReason('')
     setDialogError('')
   }
 
-  function review(id: string, status: 'approved' | 'rejected', reason?: string) {
+  function review(id: string, status: 'approved' | 'rejected', reason?: string, sourceStatus: 'pending' | 'archived' = 'pending') {
     setActiveId(id)
     setFeedback('')
     setDialogError('')
@@ -101,7 +108,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
         const response = await fetch('/api/admin/listings', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, status, verified: status === 'approved' && (verifiedSelections[id] ?? false), rejectionReason: reason }),
+          body: JSON.stringify({ id, status, sourceStatus, verified: status === 'approved' && (verifiedSelections[id] ?? false), rejectionReason: reason }),
         })
         const result: unknown = await response.json()
         const message = result && typeof result === 'object' && 'message' in result && typeof result.message === 'string' ? result.message : 'تعذّر تحديث الإعلان.'
@@ -149,7 +156,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
     }
   }
 
-  async function updateListingStatus(car: CarListing, action: 'archive' | 'republish') {
+  async function updateListingStatus(car: CarListing, action: 'archive' | 'republish' | 'restore-pending') {
     if (isMutating) return
     setIsMutating(true)
     setFeedback('')
@@ -163,7 +170,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
       const message = result && typeof result === 'object' && 'message' in result && typeof result.message === 'string' ? result.message : 'تعذّر تحديث الإعلان.'
       setFeedback(message)
       if (response.ok) {
-        setActiveSection(action === 'archive' ? 'archived' : 'published')
+        setActiveSection(action === 'archive' ? 'archived' : action === 'republish' ? 'published' : 'pending')
         router.refresh()
       }
     } catch {
@@ -198,7 +205,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
     event.preventDefault()
     if (!rejectingId) return
     if (!rejectionReason.trim()) { setDialogError('اكتب سبب الرفض قبل التأكيد.'); return }
-    review(rejectingId, 'rejected', rejectionReason)
+    review(rejectingId, 'rejected', rejectionReason, rejectingSourceStatus)
   }
 
   const selectedListings = activeSection === 'pending' ? visiblePending : activeSection === 'published' ? visiblePublished : activeSection === 'archived' ? visibleArchived : []
@@ -229,7 +236,7 @@ export function AdminDashboard({ listings, publishedListings, archivedListings, 
               </section>
               <div className="admin-review-actions"><Link className="review-details" href={`/cars/${car.id}`} target="_blank" rel="noreferrer">تفاصيل الإعلان <ArrowUpLeft aria-hidden="true" /></Link><label className="admin-verified-toggle"><input type="checkbox" checked={verifiedSelections[car.id] ?? false} disabled={isPending || isMutating} onChange={(event) => setVerifiedSelections((current) => ({ ...current, [car.id]: event.target.checked }))} /><span>منح شارة إعلان موثق من إدارة مَسَار</span></label><button type="button" className="review-reject" disabled={isPending || isMutating} onClick={() => openRejectDialog(car.id)}><X aria-hidden="true" /> رفض مع توضيح السبب</button><button type="button" className="review-archive" disabled={isPending || isMutating} onClick={() => archivePendingListing(car)}><Archive aria-hidden="true" /> حذف وأرشفة</button><button type="button" className="review-approve" disabled={isPending || isMutating || !car.verificationImage} title={!car.verificationImage ? 'لا يمكن الموافقة دون صورة تحقق' : undefined} onClick={() => review(car.id, 'approved')}><Check aria-hidden="true" />{activeId === car.id ? 'جارٍ التحديث…' : 'موافقة ونشر'}</button></div>
             </div>
-          </article>) : selectedListings.map((car) => <AdminRecordCard key={car.id} car={car} archived={activeSection === 'archived'} disabled={isMutating} onArchive={(item) => updateListingStatus(item, 'archive')} onRepublish={(item) => updateListingStatus(item, 'republish')} onDelete={(item, archived) => setDeleteTarget({ car: item, archived })} />)}
+          </article>) : selectedListings.map((car) => <AdminRecordCard key={car.id} car={car} archived={activeSection === 'archived'} disabled={isMutating} onArchive={(item) => updateListingStatus(item, 'archive')} onRepublish={(item) => updateListingStatus(item, 'republish')} onReturnToPending={(item) => updateListingStatus(item, 'restore-pending')} onReject={(item) => openRejectDialog(item.id, 'archived')} onDelete={(item, archived) => setDeleteTarget({ car: item, archived })} />)}
         </div> : <AdminEmpty title={activeSection === 'pending' ? 'لا توجد طلبات معلقة' : activeSection === 'published' ? 'لا توجد إعلانات منشورة' : 'الأرشيف فارغ حالياً'} description={activeSection === 'pending' ? 'لا توجد إعلانات تنتظر المراجعة حالياً.' : activeSection === 'published' ? 'ستظهر هنا السيارات المنشورة في السوق.' : 'الإعلانات التي يزيلها أصحابها من العرض ستُحفظ هنا للإدارة.'} />}
       </main>
       <dialog ref={deleteDialogRef} className="listing-action-dialog" aria-labelledby="admin-delete-title" onCancel={() => setDeleteTarget(null)} onClose={() => { if (deleteTarget) setDeleteTarget(null) }}>

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   const [listing] = await db
-    .select({ id: carListings.id, userId: carListings.userId, images: carListings.images, status: carListings.status })
+    .select({ id: carListings.id, userId: carListings.userId, images: carListings.images, status: carListings.status, expiresAt: carListings.expiresAt })
     .from(carListings)
     .where(eq(carListings.id, listingId))
     .limit(1)
@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'الصورة غير موجودة.' }, { status: 404 })
   }
 
-  if (listing.status !== 'approved') {
+  const isCurrentlyPublic = listing.status === 'approved' && (!listing.expiresAt || listing.expiresAt > new Date())
+  if (!isCurrentlyPublic) {
     const session = await auth.api.getSession({ headers: request.headers })
     const isOwner = session?.user.id === listing.userId
     const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified, session.user.role))
@@ -31,6 +32,6 @@ export async function GET(request: NextRequest) {
   }
 
   const response = NextResponse.redirect(new URL(pathname))
-  response.headers.set('Cache-Control', listing.status === 'approved' ? 'public, max-age=3600, stale-while-revalidate=86400' : 'private, no-store')
+  response.headers.set('Cache-Control', isCurrentlyPublic ? 'public, max-age=3600, stale-while-revalidate=86400' : 'private, no-store')
   return response
 }

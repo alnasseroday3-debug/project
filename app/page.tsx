@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, gt } from 'drizzle-orm'
 import { HomePage } from '@/components/marketplace/home-page'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
@@ -26,8 +26,8 @@ export default async function Page() {
       verified: carListings.verified,
     })
     .from(carListings)
-    .where(eq(carListings.status, 'approved'))
-    .orderBy(desc(carListings.createdAt))
+    .where(and(eq(carListings.status, 'approved'), gt(carListings.expiresAt, new Date())))
+    .orderBy(desc(carListings.publishedAt))
     .limit(24)
 
   return <HomePage cars={cars} />

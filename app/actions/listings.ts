@@ -1,6 +1,6 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
+import { and, eq, gte, lt, lte, or, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -157,7 +157,7 @@ export async function removeOwnedListing(listingId: string) {
 
   try {
     const [listing] = await db
-      .select({ status: carListings.status, images: carListings.images, verificationImage: carListings.verificationImage })
+      .select({ status: carListings.status, archivedByAdmin: carListings.archivedByAdmin, archivedByExpiry: carListings.archivedByExpiry, images: carListings.images, verificationImage: carListings.verificationImage })
       .from(carListings)
       .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id)))
       .limit(1)
@@ -166,7 +166,7 @@ export async function removeOwnedListing(listingId: string) {
     if (listing.status === 'approved') {
       const archived = await db
         .update(carListings)
-        .set({ status: 'archived', updatedAt: new Date() })
+        .set({ status: 'archived', archivedByAdmin: false, archivedByExpiry: false, updatedAt: new Date() })
         .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'approved')))
         .returning({ id: carListings.id })
       if (!archived.length) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }
@@ -177,9 +177,32 @@ export async function removeOwnedListing(listingId: string) {
       return { success: true, message: 'تمت إزالة الإعلان من العرض ونقله إلى أرشيف الإدارة.' }
     }
 
-    if (listing.status !== 'pending' && listing.status !== 'rejected') {
-      return { success: false, message: 'لا يمكن حذف هذا الإعلان بهذه الطريقة.' }
+    if (listing.status === 'archived' && listing.archivedByExpiry) {
+      const archived = await db
+        .update(carListings)
+        .set({ archivedByExpiry: false, updatedAt: new Date() })
+        .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'archived'), eq(carListings.archivedByExpiry, true)))
+        .returning({ id: carListings.id })
+      if (!archived.length) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }
+      revalidatePath('/')
+      revalidatePath('/admin')
+      revalidatePath('/my-listings')
+      return { success: true, message: 'تمت إزالة الإعلان من قائمتك وحفظه في أرشيف الإدارة.' }
     }
+
+    if (listing.status === 'archived' && listing.archivedByAdmin) {
+      const hidden = await db.update(carListings)
+        .set({ hiddenByOwner: true, updatedAt: new Date() })
+        .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'archived'), eq(carListings.archivedByAdmin, true)))
+        .returning({ id: carListings.id })
+      if (!hidden.length) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }
+      revalidatePath('/admin')
+      revalidatePath('/my-listings')
+      return { success: true, message: 'تم إخفاء الإعلان من قائمتك مع إبقائه في أرشيف الإدارة.' }
+    }
+
+    const canDelete = listing.status === 'pending' || listing.status === 'rejected'
+    if (!canDelete) return { success: false, message: 'لا يمكن حذف هذا الإعلان بهذه الطريقة.' }
 
     const deleted = await db
       .delete(carListings)
@@ -199,6 +222,82 @@ export async function removeOwnedListing(listingId: string) {
   } catch (error) {
     console.error('[v0] Failed to remove owned listing:', error)
     return { success: false, message: 'تعذّر حذف الإعلان الآن. حاول مرة أخرى.' }
+  }
+}
+
+export async function renewOwnedListing(listingId: string) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return { success: false, message: 'سجّل الدخول أولاً لتجديد إعلانك.' }
+  if (typeof listingId !== 'string' || !/^[0-9a-f-]{36}$/i.test(listingId)) {
+    return { success: false, message: 'معرّف الإعلان غير صالح.' }
+  }
+
+  try {
+    const [listing] = await db
+      .select({ status: carListings.status, expiresAt: carListings.expiresAt, directRenewals: carListings.directRenewals, archivedByAdmin: carListings.archivedByAdmin, archivedByExpiry: carListings.archivedByExpiry })
+      .from(carListings)
+      .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id)))
+      .limit(1)
+    if (!listing || listing.archivedByAdmin || !listing.expiresAt) return { success: false, message: 'لا يمكن تجديد هذا الإعلان.' }
+
+    const now = new Date()
+    const renewalWindowEnd = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000)
+    const isExpiredArchive = listing.status === 'archived' && listing.archivedByExpiry && listing.expiresAt <= now
+    const isNearExpiry = listing.status === 'approved' && listing.expiresAt <= renewalWindowEnd
+    if (!isExpiredArchive && !isNearExpiry) return { success: false, message: 'يظهر زر التجديد خلال آخر خمسة أيام من العرض أو بعد انتهائه.' }
+
+    if (listing.directRenewals < 2) {
+      const updated = await db.update(carListings)
+        .set({
+          status: 'approved',
+          expiresAt: sql`GREATEST(COALESCE(${carListings.expiresAt}, ${now}), ${now}) + INTERVAL '30 days'`,
+          publishedAt: now,
+          directRenewals: sql`${carListings.directRenewals} + 1`,
+          archivedByAdmin: false,
+          archivedByExpiry: false,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(carListings.id, listingId),
+          eq(carListings.userId, session.user.id),
+          lt(carListings.directRenewals, 2),
+          or(
+            and(eq(carListings.status, 'approved'), lte(carListings.expiresAt, renewalWindowEnd)),
+            and(eq(carListings.status, 'archived'), eq(carListings.archivedByExpiry, true), lte(carListings.expiresAt, now)),
+          ),
+        ))
+        .returning({ id: carListings.id })
+      if (updated.length) {
+        revalidatePath('/')
+        revalidatePath('/admin')
+        revalidatePath('/my-listings')
+        revalidatePath(`/cars/${listingId}`)
+        return { success: true, message: 'تم تجديد العرض لمدة 30 يوماً وإعادته إلى مقدمة الإعلانات.' }
+      }
+    }
+
+    const requested = await db.update(carListings)
+      .set({ status: 'pending', archivedByAdmin: false, archivedByExpiry: false, updatedAt: now })
+      .where(and(
+        eq(carListings.id, listingId),
+        eq(carListings.userId, session.user.id),
+        gte(carListings.directRenewals, 2),
+        or(
+          and(eq(carListings.status, 'approved'), lte(carListings.expiresAt, renewalWindowEnd)),
+          and(eq(carListings.status, 'archived'), eq(carListings.archivedByExpiry, true), lte(carListings.expiresAt, now)),
+        ),
+      ))
+      .returning({ id: carListings.id })
+    if (!requested.length) return { success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }
+
+    revalidatePath('/')
+    revalidatePath('/admin')
+    revalidatePath('/my-listings')
+    revalidatePath(`/cars/${listingId}`)
+    return { success: true, message: 'استُنفدت مرات التجديد المباشر؛ أُرسل الإعلان إلى الإدارة للموافقة على تجديده.' }
+  } catch (error) {
+    console.error('[v0] Failed to renew car listing:', error)
+    return { success: false, message: 'تعذّر تجديد الإعلان الآن. حاول مرة أخرى.' }
   }
 }
 
@@ -299,6 +398,10 @@ export async function resubmitRejectedListing(listingId: string, draft: ListingD
         verified: false,
         status: 'pending',
         rejectionReason: null,
+        publishedAt: null,
+        expiresAt: null,
+        archivedByAdmin: false,
+        archivedByExpiry: false,
         updatedAt: new Date(),
       })
       .where(and(eq(carListings.id, listingId), eq(carListings.userId, session.user.id), eq(carListings.status, 'rejected')))

@@ -473,8 +473,12 @@ select.plain-input { appearance: auto; }
 .admin-empty p { margin: 0 0 18px; color: #858b82; font-size: 12px; }
 .admin-empty .primary-button { min-height: 39px; }
 .admin-feedback { margin-bottom: 18px; }
-.admin-record-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; border-top: 1px solid #eeede8; padding-top: 12px; }
+.admin-record-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; border-top: 1px solid #eeede8; padding-top: 12px; }
 .admin-record-actions .review-details { margin-inline-end: auto; }
+.admin-restore-action { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #d7ddd5; border-radius: 7px; padding: 0 11px; background: #f4f6f2; color: #526353; font-size: 10px; font-weight: 700; cursor: pointer; }
+.admin-restore-action:hover { border-color: #9aa99a; background: #e9eee8; }
+.admin-restore-action:disabled { opacity: .55; cursor: not-allowed; }
+.admin-restore-action svg { width: 14px; height: 14px; }
 .admin-record-actions .review-reject { min-height: 36px; }
 .admin-archive-action { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #c9d8cb; border-radius: 7px; padding: 0 11px; background: #f2f7f1; color: #315f44; font-size: 10px; font-weight: 700; cursor: pointer; }
 .admin-archive-action:hover { border-color: #315f44; background: #e8f1e7; }
@@ -528,6 +532,8 @@ select.plain-input { appearance: auto; }
 .my-listing-status.is-pending { background: #f2ead9; color: #866a36; }
 .my-listing-status.is-approved { background: #d7f0e1; color: #08734d; }
 .my-listing-status.is-rejected { background: #f7dfdc; color: #a13832; }
+.my-listing-status.is-admin-archived,
+.my-listing-status.is-expired { background: #e7e8e9; color: #5f6368; }
 .my-listing-year { color: #65717a; font-size: 11px; }
 .my-listing-content .listing-make { display: block; margin-top: 12px; }
 .my-listing-content h2 { margin: 0; color: #28343d; font-size: 19px; }
@@ -541,6 +547,21 @@ select.plain-input { appearance: auto; }
 .my-listing-edit { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #08734d; border-radius: 8px; padding: 0 11px; background: #08734d; color: #fff; font-size: 10px; font-weight: 700; text-align: center; transition: background .18s ease; }
 .my-listing-edit:hover { background: #075e40; }
 .my-listing-edit svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.my-listing-expiry { display: flex; align-items: center; gap: 6px; margin-top: 12px; color: #68756c; font-size: 10px; }
+.my-listing-expiry svg { width: 14px; height: 14px; }
+.my-listing-expiry.is-near-expiry { color: #9b7132; }
+.my-listing-admin-archive { margin-top: 12px; border: 1px solid #d9dcdf; border-radius: 9px; padding: 10px 11px; background: #f1f2f3; color: #555b61; }
+.my-listing-admin-archive p { margin: 0; font-size: 10px; line-height: 1.8; }
+.my-listing-delete,
+.my-listing-renew { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; margin-top: 12px; border: 1px solid; border-radius: 8px; padding: 0 11px; font: inherit; font-size: 10px; font-weight: 700; text-align: center; cursor: pointer; transition: background .18s ease, border-color .18s ease; }
+.my-listing-delete { border-color: #e6c7c3; background: #fff7f5; color: #a7352d; }
+.my-listing-delete:hover { border-color: #c9857d; background: #ffefec; }
+.my-listing-renew { border-color: #08734d; background: #08734d; color: #fff; }
+.my-listing-renew:hover { border-color: #075e40; background: #075e40; }
+.my-listing-delete:disabled,
+.my-listing-renew:disabled { opacity: .55; cursor: not-allowed; }
+.my-listing-delete svg,
+.my-listing-renew svg { width: 14px; height: 14px; flex: 0 0 auto; }
 .my-listing-remove { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; margin-top: 13px; border: 1px solid #e6c7c3; border-radius: 8px; padding: 0 11px; background: #fff7f5; color: #a7352d; font: inherit; font-size: 10px; font-weight: 700; text-align: center; cursor: pointer; transition: background .18s ease, border-color .18s ease; }
 .my-listing-remove:hover { border-color: #c9857d; background: #ffefec; }
 .my-listing-remove:disabled { opacity: .55; cursor: not-allowed; }
@@ -578,6 +599,23 @@ select.plain-input { appearance: auto; }
 .listing-delete-cancel { border: 1px solid #d8ddd6; background: #fff; color: #58635b; }
 .listing-delete-confirm { border: 1px solid #a7352d; background: #a7352d; color: #fff; }
 .listing-delete-cancel:disabled, .listing-delete-confirm:disabled { opacity: .55; cursor: not-allowed; }
+.listing-renewal-dialog { width: min(500px, calc(100% - 32px)); max-height: calc(100% - 32px); margin: auto; border: 1px solid #e4e7df; border-radius: 17px; padding: 24px; background: #fffefa; color: #28342d; box-shadow: 0 24px 70px rgba(22, 36, 28, .24); }
+.listing-renewal-dialog::backdrop { background: rgba(17, 28, 22, .56); backdrop-filter: blur(3px); }
+.listing-renewal-content { display: flex; flex-direction: column; gap: 11px; }
+.listing-renewal-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: rgba(8, 115, 77, .12); color: #08734d; }
+.listing-renewal-content h2 { margin: 0; color: #28382d; font-size: 20px; line-height: 1.55; }
+.listing-renewal-content > p { margin: 0; color: #727c73; font-size: 12px; line-height: 1.8; }
+.listing-renewal-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 7px; }
+.listing-renewal-confirm,
+.listing-renewal-sold,
+.listing-renewal-cancel { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid; border-radius: 9px; padding: 9px 12px; font: inherit; font-size: 11px; font-weight: 700; text-align: center; cursor: pointer; }
+.listing-renewal-confirm { border-color: #078052; background: #078052; color: #fff; }
+.listing-renewal-sold { border-color: #a7352d; background: #a7352d; color: #fff; }
+.listing-renewal-cancel { border-color: #d8ddd6; background: #fff; color: #58635b; }
+.listing-renewal-confirm:disabled,
+.listing-renewal-sold:disabled,
+.listing-renewal-cancel:disabled { opacity: .55; cursor: not-allowed; }
+.listing-renewal-actions svg { width: 15px; height: 15px; flex: 0 0 auto; }
 .existing-verification-note { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; border: 1px solid #cfe1d0; border-radius: 8px; padding: 10px; background: #f5f9f4; color: #55715a; font-size: 10px; line-height: 1.7; }
 .existing-verification-note svg { width: 16px; height: 16px; flex: 0 0 auto; }
 .my-listings-empty { display: flex; flex-direction: column; align-items: center; padding: 70px 20px; border: 1px dashed #bac3c9; border-radius: 14px; background: rgba(243,245,246,.65); text-align: center; }
@@ -1289,7 +1327,8 @@ body {
 .support-dialog,
 .admin-reject-dialog,
 .listing-action-dialog,
-.listing-delete-dialog {
+.listing-delete-dialog,
+.listing-renewal-dialog {
   border-color: #27272A;
   background-color: #141416;
   color: #FFFFFF;
@@ -1297,6 +1336,7 @@ body {
 
 .admin-reject-form label,
 .admin-reject-form h2,
+.listing-renewal-content h2,
 .admin-record-details h3,
 .admin-record-details dd,
 .support-success h3,
@@ -1354,7 +1394,9 @@ body {
 
 .admin-reject-cancel,
 .admin-archive-action,
+.admin-restore-action,
 .admin-permanent-delete,
+.listing-renewal-cancel,
 .my-listing-remove,
 .my-listing-delete,
 .listing-action-cancel,
@@ -1392,6 +1434,30 @@ body {
   background-color: #2b1717;
   color: #fca5a5;
 }
+
+.my-listing-status.is-admin-archived,
+.my-listing-status.is-expired {
+  border-color: #3F3F46;
+  background-color: #27272A;
+  color: #D4D4D8;
+}
+
+.my-listing-admin-archive {
+  border-color: #3F3F46;
+  background-color: #202023;
+  color: #D4D4D8;
+}
+
+.my-listing-expiry { color: #A1A1AA; }
+.my-listing-expiry.is-near-expiry { color: #FBBF24; }
+.my-listing-renew { border-color: #10B981; background-color: #10B981; color: #FFFFFF; }
+.my-listing-renew:hover { border-color: #059669; background-color: #059669; }
+.listing-renewal-icon { background-color: rgba(16, 185, 129, .12); color: #34D399; }
+.listing-renewal-confirm { border-color: #10B981; background-color: #10B981; color: #FFFFFF; }
+.listing-renewal-sold { border-color: #7f3030; background-color: #7f1d1d; color: #FECACA; }
+.listing-renewal-cancel { border-color: #3F3F46; background-color: #202023; color: #D4D4D8; }
+.admin-restore-action { border-color: #3F3F46; background-color: #202023; color: #D4D4D8; }
+.admin-restore-action:hover { border-color: #52525B; background-color: #27272A; }
 
 .inspection-badge.is-no {
   border-color: #3F3F46;

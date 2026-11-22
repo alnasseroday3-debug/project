@@ -32,7 +32,7 @@ export async function PATCH(request: NextRequest) {
     if (values.action === 'archive-pending') {
       if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })
       const archived = await db.update(carListings)
-        .set({ status: 'archived', updatedAt: new Date() })
+        .set({ status: 'archived', archivedByAdmin: true, archivedByExpiry: false, updatedAt: new Date() })
         .where(and(eq(carListings.id, id), eq(carListings.status, 'pending')))
         .returning({ id: carListings.id })
       if (archived.length === 0) {
@@ -45,11 +45,28 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'تم حذف الطلب وأرشفته دون إرساله إلى المعلن.' })
     }
 
+    if (values.action === 'restore-pending') {
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })
+      const updated = await db.update(carListings)
+        .set({ status: 'pending', rejectionReason: null, publishedAt: null, expiresAt: null, archivedByAdmin: false, archivedByExpiry: false, hiddenByOwner: false, updatedAt: new Date() })
+        .where(and(eq(carListings.id, id), eq(carListings.status, 'archived')))
+        .returning({ id: carListings.id })
+      if (!updated.length) return NextResponse.json({ success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }, { status: 409 })
+      revalidatePath('/')
+      revalidatePath('/admin')
+      revalidatePath('/my-listings')
+      revalidatePath(`/cars/${id}`)
+      return NextResponse.json({ success: true, message: 'أُعيد الإعلان إلى قائمة طلبات المراجعة.' })
+    }
+
     if (values.action === 'archive' || values.action === 'republish') {
       if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, message: 'معرّف الإعلان غير صالح.' }, { status: 400 })
       const archiving = values.action === 'archive'
+      const now = new Date()
       const updated = await db.update(carListings)
-        .set({ status: archiving ? 'archived' : 'approved', updatedAt: new Date() })
+        .set(archiving
+          ? { status: 'archived', archivedByAdmin: true, archivedByExpiry: false, updatedAt: now }
+          : { status: 'approved', rejectionReason: null, publishedAt: now, expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), directRenewals: 0, archivedByAdmin: false, archivedByExpiry: false, hiddenByOwner: false, updatedAt: now })
         .where(and(eq(carListings.id, id), eq(carListings.status, archiving ? 'approved' : 'archived')))
         .returning({ id: carListings.id })
       if (updated.length === 0) {
@@ -59,10 +76,11 @@ export async function PATCH(request: NextRequest) {
       revalidatePath('/admin')
       revalidatePath('/my-listings')
       revalidatePath(`/cars/${id}`)
-      return NextResponse.json({ success: true, message: archiving ? 'تم نقل الإعلان إلى الأرشيف.' : 'تمت إعادة نشر الإعلان.' })
+      return NextResponse.json({ success: true, message: archiving ? 'تم نقل الإعلان إلى الأرشيف.' : 'تمت إعادة نشر الإعلان لمدة 30 يوماً.' })
     }
 
-    if (!id || (status !== 'approved' && status !== 'rejected') || typeof values.verified !== 'boolean') {
+    const sourceStatus = values.sourceStatus === 'archived' ? 'archived' : 'pending'
+    if (!id || (status !== 'approved' && status !== 'rejected') || typeof values.verified !== 'boolean' || (sourceStatus === 'archived' && status !== 'rejected')) {
       return NextResponse.json({ success: false, message: 'بيانات المراجعة غير صالحة.' }, { status: 400 })
     }
     if (status === 'rejected' && (!rejectionReason.trim() || rejectionReason.length > 2000)) {
@@ -76,17 +94,20 @@ export async function PATCH(request: NextRequest) {
       if (!pendingListing.verificationImage) return NextResponse.json({ success: false, message: 'لا يمكن نشر الإعلان قبل إرفاق صورة التحقق.' }, { status: 422 })
     }
 
+    const now = new Date()
     const updated = await db.update(carListings)
-      .set({ status, verified: status === 'approved' && verified, rejectionReason: status === 'rejected' ? rejectionReason : null, updatedAt: new Date() })
-      .where(and(eq(carListings.id, id), eq(carListings.status, 'pending')))
+      .set(status === 'approved'
+        ? { status, verified, rejectionReason: null, publishedAt: now, expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), directRenewals: 0, archivedByAdmin: false, archivedByExpiry: false, hiddenByOwner: false, updatedAt: now }
+        : { status, verified: false, rejectionReason, publishedAt: null, expiresAt: null, archivedByAdmin: false, archivedByExpiry: false, hiddenByOwner: false, updatedAt: now })
+      .where(and(eq(carListings.id, id), eq(carListings.status, sourceStatus)))
       .returning({ id: carListings.id })
-    if (updated.length === 0) return NextResponse.json({ success: false, message: 'هذا الإعلان لم يعد قيد المراجعة.' }, { status: 409 })
+    if (updated.length === 0) return NextResponse.json({ success: false, message: 'تغيرت حالة الإعلان. حدّث الصفحة وحاول مجدداً.' }, { status: 409 })
 
     revalidatePath('/')
     revalidatePath('/admin')
     revalidatePath('/my-listings')
     revalidatePath(`/cars/${id}`)
-    return NextResponse.json({ success: true, message: status === 'approved' ? 'تم نشر الإعلان.' : 'تم رفض الإعلان.' })
+    return NextResponse.json({ success: true, message: status === 'approved' ? 'تم نشر الإعلان لمدة 30 يوماً.' : 'تم رفض الإعلان وإرسال السبب إلى صاحبه.' })
   } catch (error) {
     console.error('[v0] Failed to review car listing:', error)
     return NextResponse.json({ success: false, message: 'تعذّر تحديث الإعلان الآن.' }, { status: 500 })

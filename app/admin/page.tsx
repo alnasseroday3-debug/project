@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, gt } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { AdminDashboard } from '@/components/marketplace/admin-dashboard'
 import { getCurrentSession, isAdminSession } from '@/lib/auth-helpers'
@@ -14,7 +14,7 @@ export default async function AdminPage() {
 
   const [pending, published, archived, support] = await Promise.all([
     db.select().from(carListings).where(eq(carListings.status, 'pending')).orderBy(asc(carListings.createdAt)),
-    db.select().from(carListings).where(eq(carListings.status, 'approved')).orderBy(desc(carListings.updatedAt)),
+    db.select().from(carListings).where(and(eq(carListings.status, 'approved'), gt(carListings.expiresAt, new Date()))).orderBy(desc(carListings.publishedAt)),
     db.select().from(carListings).where(eq(carListings.status, 'archived')).orderBy(desc(carListings.updatedAt)),
     db.select({ id: supportTickets.id, reference: supportTickets.reference, fullName: supportTickets.fullName, whatsappNumber: supportTickets.whatsappNumber, category: supportTickets.category, message: supportTickets.message, createdAt: supportTickets.createdAt }).from(supportTickets).orderBy(desc(supportTickets.createdAt)),
   ])

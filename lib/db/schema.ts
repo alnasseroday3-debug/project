@@ -109,6 +109,12 @@ export const carListings = pgTable('car_listings', {
   verified: boolean('verified').notNull().default(false),
   status: text('status').$type<ListingStatus>().notNull().default('pending'),
   rejectionReason: text('rejection_reason'),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  directRenewals: integer('direct_renewals').notNull().default(0),
+  archivedByAdmin: boolean('archived_by_admin').notNull().default(false),
+  archivedByExpiry: boolean('archived_by_expiry').notNull().default(false),
+  hiddenByOwner: boolean('hidden_by_owner').notNull().default(false),
   sellerName: text('sellerName'),
   sellerPhone: text('sellerPhone'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -123,4 +129,4 @@ export const rateLimits = pgTable('rate_limits', {
 
 export type CarListing = typeof carListings.$inferSelect
 export type PublicCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'mileage' | 'mileageUnknown' | 'askingPrice' | 'negotiable' | 'city' | 'images' | 'verified'>
-export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'askingPrice' | 'status' | 'images' | 'rejectionReason'>
+export type OwnerCarListing = Pick<CarListing, 'id' | 'make' | 'model' | 'year' | 'condition' | 'askingPrice' | 'status' | 'images' | 'rejectionReason' | 'expiresAt' | 'directRenewals' | 'archivedByAdmin' | 'archivedByExpiry' | 'hiddenByOwner'>

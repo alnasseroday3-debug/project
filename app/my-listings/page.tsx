@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from 'drizzle-orm'
+import { and, desc, eq, ne, or } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { MyListings } from '@/components/marketplace/my-listings'
 import { getCurrentSession } from '@/lib/auth-helpers'
@@ -22,9 +22,18 @@ export default async function MyListingsPage() {
       status: carListings.status,
       images: carListings.images,
       rejectionReason: carListings.rejectionReason,
+      expiresAt: carListings.expiresAt,
+      directRenewals: carListings.directRenewals,
+      archivedByAdmin: carListings.archivedByAdmin,
+      archivedByExpiry: carListings.archivedByExpiry,
+      hiddenByOwner: carListings.hiddenByOwner,
     })
     .from(carListings)
-    .where(and(eq(carListings.userId, session.user.id), ne(carListings.status, 'archived')))
+    .where(and(
+      eq(carListings.userId, session.user.id),
+      eq(carListings.hiddenByOwner, false),
+      or(ne(carListings.status, 'archived'), eq(carListings.archivedByAdmin, true), eq(carListings.archivedByExpiry, true)),
+    ))
     .orderBy(desc(carListings.createdAt))
 
   return <MyListings listings={listings} />

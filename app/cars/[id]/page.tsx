@@ -57,11 +57,12 @@ export default async function CarPage({ params }: CarPageProps) {
     description: carListings.description,
     images: carListings.images,
     status: carListings.status,
+    expiresAt: carListings.expiresAt,
     sellerName: carListings.sellerName,
     sellerPhone: carListings.sellerPhone,
     verified: carListings.verified,
   }).from(carListings).where(eq(carListings.id, id)).limit(1)
-  if (!car || car.status !== 'approved') notFound()
+  if (!car || car.status !== 'approved' || (car.expiresAt && car.expiresAt <= new Date())) notFound()
 
   const images = car.images.map((image) => image.startsWith('http') || image.startsWith('/')
     ? image

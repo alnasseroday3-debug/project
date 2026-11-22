@@ -1,5 +1,5 @@
 import { Analytics } from '@vercel/analytics/next'
-import { and, count, eq, ne } from 'drizzle-orm'
+import { and, count, eq, ne, or } from 'drizzle-orm'
 import type { Metadata, Viewport } from 'next'
 import { SiteFooter } from '@/components/marketplace/site-footer'
 import { SiteHeader } from '@/components/marketplace/site-header'
@@ -7,6 +7,7 @@ import { SupportContact } from '@/components/marketplace/support-contact'
 import { getCurrentSession, isAdminEmail } from '@/lib/auth-helpers'
 import { db } from '@/lib/db'
 import { carListings } from '@/lib/db/schema'
+import { archiveExpiredListings } from '@/lib/listing-lifecycle'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  await archiveExpiredListings()
   const session = await getCurrentSession()
   const isAdmin = Boolean(session?.user && isAdminEmail(session.user.email, session.user.emailVerified, session.user.role))
   let pendingCount = 0
@@ -48,7 +50,11 @@ export default async function RootLayout({
     const [result] = await db
       .select({ total: count() })
       .from(carListings)
-      .where(and(eq(carListings.userId, session.user.id), ne(carListings.status, 'archived')))
+      .where(and(
+        eq(carListings.userId, session.user.id),
+        eq(carListings.hiddenByOwner, false),
+        or(ne(carListings.status, 'archived'), eq(carListings.archivedByAdmin, true), eq(carListings.archivedByExpiry, true)),
+      ))
     myListingsCount = result?.total ?? 0
   }
   if (isAdmin) {
