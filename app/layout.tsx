@@ -13,6 +13,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   metadataBase: getSiteUrl(),
+  manifest: '/manifest.json',
   title: {
     default: 'مَسار. | سوق سوريا الشامل للسيارات والعقارات والأجهزة والأثاث',
     template: '%s | مَسار.',
@@ -32,14 +33,21 @@ export const metadata: Metadata = {
     description: 'اكتشف السيارات والعقارات والأجهزة والأثاث في سوريا عبر مَسار، سوق شامل بإعلانات واضحة ومراجعة دقيقة وتواصل مباشر.',
     images: ['/images/syrian-marketplace-hero.png'],
   },
-  applicationName: 'مَسَار',
+  applicationName: 'مَسار.',
   generator: 'v0.app',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'مَسار',
+  },
   icons: {
     icon: [
       { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
       { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icons/icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
-    apple: '/apple-icon.png',
+    apple: '/icons/icon-192.png',
   },
 }
 
@@ -47,7 +55,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   colorScheme: 'dark',
-  themeColor: '#0A0A0B',
+  themeColor: '#10B981',
 }
 
 export const dynamic = 'force-dynamic'

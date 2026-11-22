@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { AtSign, Store } from 'lucide-react'
+import { PwaInstallButton } from '@/components/marketplace/pwa-install-button'
 
 export function SiteFooter({ isAdmin }: { isAdmin: boolean }) {
   return (
@@ -11,6 +12,7 @@ export function SiteFooter({ isAdmin }: { isAdmin: boolean }) {
             <span>مَسَار<span className="wordmark-dot">.</span></span>
           </Link>
           <p>كل خيار يبدأ بتفاصيل واضحة. اكتشف ما تحتاجه في سوق سوريا الشامل.</p>
+          <PwaInstallButton />
         </div>
         <div className="footer-links">
           <span className="footer-title">استكشف</span>
