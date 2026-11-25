@@ -59,7 +59,8 @@ async function deriveSharedConversationKey(conversationId: string) {
 export async function getOrCreateMessagingKeys(userId: string): Promise<LocalMessagingKeys> {
   const existing = await readKeys(userId)
   if (existing) return existing
-  const generated = await crypto.subtle.generateKey({ name: 'RSA-OAEP', modulusLength: 3072, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['encrypt', 'decrypt']) as CryptoKeyPair
+  const exponent = Uint8Array.of(1, 0, 1)
+  const generated = await crypto.subtle.generateKey({ name: 'RSA-OAEP', modulusLength: 3072, publicExponent: exponent, hash: 'SHA-256' }, true, ['encrypt', 'decrypt']) as CryptoKeyPair
   const publicKey = toBase64(await crypto.subtle.exportKey('spki', generated.publicKey))
   const privateBytes = new Uint8Array(await crypto.subtle.exportKey('pkcs8', generated.privateKey))
   const privateKey = await crypto.subtle.importKey('pkcs8', privateBytes, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['decrypt'])
@@ -116,5 +117,5 @@ export async function decryptMessage(ciphertext: string, iv: string, wrappedKey:
   rawKey.fill(0)
   const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(iv) }, contentKey, fromBase64(ciphertext))
   return new TextDecoder().decode(plaintext)
-}
-  
+  }
+    
