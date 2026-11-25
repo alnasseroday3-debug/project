@@ -132,4 +132,4 @@ export function MessagesView({ userId, targetId }: { userId: string; targetId: s
 function StartConversation({ targetId, onStart, busy, error }: { targetId: string; onStart: (target: UserSummary) => void; busy: boolean; error: string }) {
   const { data, isLoading } = useSWR<{ profile: UserSummary }>(`/api/social/profiles/${encodeURIComponent(targetId)}`, fetcher)
   const target = data?.profile
-    
+        
