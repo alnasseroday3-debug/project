@@ -117,3 +117,4 @@ export async function decryptMessage(ciphertext: string, iv: string, wrappedKey:
   const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(iv) }, contentKey, fromBase64(ciphertext))
   return new TextDecoder().decode(plaintext)
 }
+  
