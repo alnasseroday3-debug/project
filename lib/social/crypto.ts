@@ -45,6 +45,17 @@ function fromBase64(value: string) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0))
 }
 
+async function deriveSharedConversationKey(conversationId: string) {
+  const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(`masar-e2ee:${conversationId}`), 'PBKDF2', false, ['deriveKey'])
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: new TextEncoder().encode('masar-syria-private-chat-v1'), iterations: 100_000, hash: 'SHA-256' },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  )
+}
+
 export async function getOrCreateMessagingKeys(userId: string): Promise<LocalMessagingKeys> {
   const existing = await readKeys(userId)
   if (existing) return existing
@@ -59,26 +70,48 @@ export async function getOrCreateMessagingKeys(userId: string): Promise<LocalMes
 }
 
 export async function loadMessagingKeys(userId: string) {
-  return readKeys(userId)
+  return getOrCreateMessagingKeys(userId)
 }
 
-export async function encryptMessage(plaintext: string, senderPublicKey: string, recipientPublicKey: string) {
+export async function encryptMessage(plaintext: string, senderPublicKey: string, recipientPublicKey: string | null, conversationId?: string) {
   const contentKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, contentKey, new TextEncoder().encode(plaintext))
   const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', contentKey))
   const sender = await crypto.subtle.importKey('spki', fromBase64(senderPublicKey), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'])
-  const recipient = await crypto.subtle.importKey('spki', fromBase64(recipientPublicKey), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'])
-  const [senderWrappedKey, recipientWrappedKey] = await Promise.all([
-    crypto.subtle.encrypt({ name: 'RSA-OAEP' }, sender, rawKey),
-    crypto.subtle.encrypt({ name: 'RSA-OAEP' }, recipient, rawKey),
-  ])
+  const senderWrappedKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, sender, rawKey)
+
+  let recipientWrappedKeyStr = ''
+  if (recipientPublicKey) {
+    const recipient = await crypto.subtle.importKey('spki', fromBase64(recipientPublicKey), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'])
+    const recipientWrappedKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, recipient, rawKey)
+    recipientWrappedKeyStr = toBase64(recipientWrappedKey)
+  } else if (conversationId) {
+    const sharedKey = await deriveSharedConversationKey(conversationId)
+    const wrapIv = crypto.getRandomValues(new Uint8Array(12))
+    const wrapped = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: wrapIv }, sharedKey, rawKey)
+    recipientWrappedKeyStr = `shared:${toBase64(wrapIv.buffer)}:${toBase64(wrapped)}`
+  }
+
   rawKey.fill(0)
-  return { ciphertext: toBase64(ciphertext), iv: toBase64(iv.buffer), senderWrappedKey: toBase64(senderWrappedKey), recipientWrappedKey: toBase64(recipientWrappedKey) }
+  return {
+    ciphertext: toBase64(ciphertext),
+    iv: toBase64(iv.buffer),
+    senderWrappedKey: toBase64(senderWrappedKey),
+    recipientWrappedKey: recipientWrappedKeyStr,
+  }
 }
 
-export async function decryptMessage(ciphertext: string, iv: string, wrappedKey: string, privateKey: CryptoKey) {
-  const rawKey = new Uint8Array(await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, privateKey, fromBase64(wrappedKey)))
+export async function decryptMessage(ciphertext: string, iv: string, wrappedKey: string, privateKey: CryptoKey, conversationId?: string) {
+  let rawKey: Uint8Array
+  if (wrappedKey.startsWith('shared:') && conversationId) {
+    const [, wrapIvB64, wrappedB64] = wrappedKey.split(':')
+    const sharedKey = await deriveSharedConversationKey(conversationId)
+    const decryptedRaw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(wrapIvB64) }, sharedKey, fromBase64(wrappedB64))
+    rawKey = new Uint8Array(decryptedRaw)
+  } else {
+    rawKey = new Uint8Array(await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, privateKey, fromBase64(wrappedKey)))
+  }
   const contentKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt'])
   rawKey.fill(0)
   const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(iv) }, contentKey, fromBase64(ciphertext))
