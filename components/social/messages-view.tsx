@@ -106,5 +106,5 @@ function StartConversation({ targetId, onStart, busy, error }: { targetId: strin
   const { data, isLoading } = useSWR<{ profile: UserSummary }>(`/api/social/profiles/${encodeURIComponent(targetId)}`, fetcher)
   const target = data?.profile
   return <div className="social-thread-empty">{isLoading ? <p className="social-state" role="status">جارٍ تحميل الحساب…</p> : target ? <><span className="social-avatar">{target.image ? <img src={target.image} alt="" /> : target.name.slice(0, 1) || <UserRound aria-hidden="true" />}</span><h2>ابدأ محادثة مع {target.name}</h2><p>رسائلك خاصة ومشفّرة تلقائياً بينك وبين {target.name} فقط.</p>{error && <p className="social-inline-error" role="alert">{error}</p>}<button type="button" className="social-message-link" onClick={() => onStart(target)} disabled={busy}><Send aria-hidden="true" /> ابدأ المحادثة الآن</button></> : <p className="social-inline-error" role="alert">تعذّر العثور على الحساب.</p>}</div>
-}
-  
+                                }
+             
