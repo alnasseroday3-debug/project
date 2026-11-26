@@ -119,7 +119,7 @@ function ListingCard({ listing, isAuthenticated }: { listing: HomeListing; isAut
   )
 }
 
-export function HomePage({ initialPage: _initialPage, isAuthenticated }: { initialPage: ListingsPage; isAuthenticated: boolean }) {
+export function HomePage({ isAuthenticated }: { initialPage?: ListingsPage; isAuthenticated: boolean }) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<'all' | ListingCategory>('all')
   const [governorate, setGovernorate] = useState('')
@@ -208,4 +208,4 @@ export function HomePage({ initialPage: _initialPage, isAuthenticated }: { initi
         <div className="marketplace-control-row">
           <Link className="marketplace-add-button" href="/sell"><span>+</span> إضافة إعلان</Link>
           <div className="marketplace-filter-group" aria-label="تصفية الإعلانات">
-  
+      
