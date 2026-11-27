@@ -136,7 +136,6 @@ export function HomePage({ initialPage, isAuthenticated }: { initialPage: Listin
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
 
-  // إظهار الإعلانات والفلاتر فقط عند اختيار قسم أو كتابة بحث
   const isBrowsing =
     category !== 'all' ||
     Boolean(query.trim()) ||
@@ -235,4 +234,5 @@ export function HomePage({ initialPage, isAuthenticated }: { initialPage: Listin
           </label>
           <div className="hero-trust" aria-label="مزايا مَسار">
             <span><ShieldCheck aria-hidden="true" /> مراجعة قبل النشر</span>
-  
+            <span><CircleHelp aria-hidden="true" /> تواصل مباشر</span>
+                                                     
