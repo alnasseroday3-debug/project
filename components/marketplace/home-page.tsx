@@ -208,4 +208,5 @@ export function HomePage({ isAuthenticated }: { initialPage?: ListingsPage; isAu
         <div className="marketplace-control-row">
           <Link className="marketplace-add-button" href="/sell"><span>+</span> إضافة إعلان</Link>
           <div className="marketplace-filter-group" aria-label="تصفية الإعلانات">
-      
+            <label className="marketplace-select"><span>المحافظة</span><select value={governorate} onChange={(event) => setGovernorate(event.target.value)} aria-label="تصفية حسب المحافظة"><option value="">كل المحافظات</option>{syrianGovernorates.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
+    
