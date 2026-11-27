@@ -5,6 +5,7 @@ import { carListings, user } from '@/lib/db/schema'
 import { listingCategoryLabels, type ListingCategory } from '@/lib/listing-categories'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   const apiKey = (process.env.GEMINI_API_KEY || '').trim()
@@ -87,11 +88,11 @@ ${usersContext}`
     : []
 
   const host = ['generativelanguage', 'googleapis', 'com'].join('.')
-  let fastModel = 'gemini-3-flash-preview'
+  let fastModel = 'gemini-flash-latest'
 
   try {
     const listUrl = 'https://' + host + '/v1beta/models?key=' + encodeURIComponent(apiKey)
-    const listRes = await fetch(listUrl, { signal: AbortSignal.timeout(3000) })
+    const listRes = await fetch(listUrl)
     if (listRes.ok) {
       const listData = (await listRes.json()) as {
         models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>
@@ -108,9 +109,8 @@ ${usersContext}`
             !n.includes('2.5') &&
             !n.includes('1.5'),
         )
-      if (modernModels.length > 0) {
-        fastModel = modernModels.at(0) || fastModel
-      }
+      const liteModel = modernModels.find((n) => n.includes('lite'))
+      fastModel = liteModel || modernModels.at(0) || fastModel
     }
   } catch {
     // use default fastModel
@@ -121,7 +121,6 @@ ${usersContext}`
     const geminiResponse = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemInstruction }] },
         contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
@@ -147,8 +146,8 @@ ${usersContext}`
 
     return NextResponse.json({ reply })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'انتهت مهلة الاتصال'
-    return NextResponse.json({ error: 'تعذّر الحصول على رد سريع (' + fastModel + '): ' + msg }, { status: 504 })
+    const msg = err instanceof Error ? err.message : 'خطأ في الاتصال'
+    return NextResponse.json({ error: 'تعذّر الحصول على رد (' + fastModel + '): ' + msg }, { status: 504 })
   }
-        }
-                
+}
+  
