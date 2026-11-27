@@ -86,42 +86,46 @@ ${usersContext}`
       }))
     : []
 
-  try {
-    const geminiResponse = await fetch(
-      'https://googleapis.com',
-      {
+  const host = '://googleapis.com'
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest']
+  let lastError = ''
+
+  for (const modelName of modelsToTry) {
+    try {
+      const endpoint = new URL(`https://${host}/v1beta/models/${modelName}:generateContent`)
+      endpoint.searchParams.set('key', apiKey)
+
+      const geminiResponse = await fetch(endpoint.toString(), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
           contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
           generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
         }),
-      },
-    )
+      })
 
-    if (!geminiResponse.ok) {
-      const detail = await geminiResponse.text().catch(() => '')
-      return NextResponse.json(
-        { error: `خطأ من Gemini (${geminiResponse.status}): ${detail.slice(0, 140)}` },
-        { status: 502 },
-      )
+      if (!geminiResponse.ok) {
+        lastError = `${modelName}: ${geminiResponse.status}`
+        continue
+      }
+
+      const geminiData = (await geminiResponse.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+      }
+      const reply =
+        geminiData.candidates?.at(0)?.content?.parts?.at(0)?.text?.trim() ||
+        'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
+
+      return NextResponse.json({ reply })
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : 'خطأ اتصال'
     }
-
-    const geminiData = (await geminiResponse.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-    }
-    const reply =
-      geminiData.candidates?.at(0)?.content?.parts?.at(0)?.text?.trim() ||
-      'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
-
-    return NextResponse.json({ reply })
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'خطأ غير معروف'
-    return NextResponse.json({ error: `فشل الاتصال: ${msg}` }, { status: 500 })
   }
-  }
-                     
+
+  return NextResponse.json(
+    { error: `تعذّر الحصول على رد من الذكاء الاصطناعي (${lastError}). تأكد من صلاحية مفتاح GEMINI_API_KEY في Google AI Studio.` },
+    { status: 502 },
+  )
+}
+  
