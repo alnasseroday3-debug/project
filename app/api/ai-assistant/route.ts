@@ -96,12 +96,20 @@ ${usersContext}`
       const listData = (await listRes.json()) as {
         models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>
       }
-      const flashModels = (listData.models || [])
+      const modernModels = (listData.models || [])
         .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
         .map((m) => (m.name || '').replace(/^models\//, ''))
-        .filter((n) => n.includes('flash') && !n.includes('tts') && !n.includes('image') && !n.includes('2.0'))
-      if (flashModels.length > 0) {
-        fastModel = flashModels.at(0) || fastModel
+        .filter(
+          (n) =>
+            n.includes('flash') &&
+            !n.includes('tts') &&
+            !n.includes('image') &&
+            !n.includes('2.0') &&
+            !n.includes('2.5') &&
+            !n.includes('1.5'),
+        )
+      if (modernModels.length > 0) {
+        fastModel = modernModels.at(0) || fastModel
       }
     }
   } catch {
@@ -142,5 +150,5 @@ ${usersContext}`
     const msg = err instanceof Error ? err.message : 'انتهت مهلة الاتصال'
     return NextResponse.json({ error: 'تعذّر الحصول على رد سريع (' + fastModel + '): ' + msg }, { status: 504 })
   }
-}
-  
+        }
+                
