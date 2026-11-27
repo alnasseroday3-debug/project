@@ -7,9 +7,14 @@ import { listingCategoryLabels, type ListingCategory } from '@/lib/listing-categ
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'مفتاح GEMINI_API_KEY غير موجود في إعدادات Vercel.' }, { status: 500 })
+  const groqKey = (process.env.GROQ_API_KEY || '').trim()
+  const geminiKey = (process.env.GEMINI_API_KEY || '').trim()
+
+  if (!groqKey && !geminiKey) {
+    return NextResponse.json(
+      { error: 'يرجى إضافة GROQ_API_KEY أو GEMINI_API_KEY في إعدادات Vercel.' },
+      { status: 500 },
+    )
   }
 
   const body = (await request.json().catch(() => null)) as {
@@ -86,32 +91,75 @@ ${usersContext}`
 
   const recentHistory = Array.isArray(body?.history)
     ? body.history.slice(-8).map((msg) => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: String(msg.text || '').slice(0, 800) }],
+        role: msg.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+        content: String(msg.text || '').slice(0, 800),
       }))
     : []
 
+  if (groqKey) {
+    try {
+      const groqResponse = await fetch('https://groq.com', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${groqKey}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: systemInstruction },
+            ...recentHistory,
+            { role: 'user', content: question },
+          ],
+          temperature: 0.4,
+          max_tokens: 800,
+        }),
+      })
+
+      if (!groqResponse.ok) {
+        const detail = await groqResponse.text().catch(() => '')
+        return NextResponse.json(
+          { error: `خطأ من Groq (${groqResponse.status}): ${detail.slice(0, 120)}` },
+          { status: 502 },
+        )
+      }
+
+      const groqData = (await groqResponse.json()) as {
+        choices?: Array<{ message?: { content?: string } }>
+      }
+      const reply = groqData.choices?.at(0)?.message?.content?.trim() || 'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
+      return NextResponse.json({ reply })
+    } catch (err) {
+      const cause = err instanceof Error && 'cause' in err ? String((err as { cause?: unknown }).cause) : ''
+      const msg = err instanceof Error ? err.message : 'خطأ غير معروف'
+      return NextResponse.json({ error: `فشل الاتصال بـ Groq: ${msg} ${cause}` }, { status: 500 })
+    }
+  }
+
   try {
     const geminiResponse = await fetch(
-      `https://googleapis.com{encodeURIComponent(apiKey)}`,
+      `https://googleapis.com{encodeURIComponent(geminiKey)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 800,
-          },
+          contents: [
+            ...recentHistory.map((m) => ({
+              role: m.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: m.content }],
+            })),
+            { role: 'user', parts: [{ text: question }] },
+          ],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
         }),
       },
     )
 
     if (!geminiResponse.ok) {
-      const errDetail = await geminiResponse.text().catch(() => '')
+      const detail = await geminiResponse.text().catch(() => '')
       return NextResponse.json(
-        { error: `خطأ من خدمة الذكاء الاصطناعي (${geminiResponse.status}): ${errDetail.slice(0, 120)}` },
+        { error: `خطأ من Gemini (${geminiResponse.status}): ${detail.slice(0, 120)}` },
         { status: 502 },
       )
     }
@@ -119,14 +167,14 @@ ${usersContext}`
     const geminiData = (await geminiResponse.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
     }
-    const firstCandidate = geminiData.candidates?.at(0)
-    const firstPart = firstCandidate?.content?.parts?.at(0)
-    const reply = firstPart?.text?.trim() || 'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
-
+    const reply =
+      geminiData.candidates?.at(0)?.content?.parts?.at(0)?.text?.trim() ||
+      'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
     return NextResponse.json({ reply })
   } catch (err) {
+    const cause = err instanceof Error && 'cause' in err ? String((err as { cause?: unknown }).cause) : ''
     const msg = err instanceof Error ? err.message : 'خطأ غير معروف'
-    return NextResponse.json({ error: `تعذّر الاتصال بخدمة الذكاء الاصطناعي: ${msg}` }, { status: 500 })
+    return NextResponse.json({ error: `فشل الاتصال: ${msg} ${cause}` }, { status: 500 })
   }
-        }
-        
+      }
+  
