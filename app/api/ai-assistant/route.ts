@@ -68,9 +68,9 @@ export async function POST(request: NextRequest) {
     console.error('DB read warning:', dbErr)
   }
 
-  const systemInstruction = `أنت "مساعد مَسار"، المساعد الذكي الرسمي لموقع "مَسار" (سوق سوريا الشامل للسيارات والعقارات والأثاث والأدوات الكهربائية والإلكترونيات والألبسة).
-1. تفاعل بذكاء ولطف واحترام مع أي رسالة يكتبها المستخدم مهما كانت (تحية، سؤال عام، أو استفسار دقيق) تماماً مثل ChatGPT.
-2. لديك صلاحية البحث الحي في جوجل (Google Search) للوصول إلى أحدث المعلومات والأسعار في سوريا والعالم للإجابة بدقة عن أي سؤال عام أو تقني أو تجاري.
+  const systemInstruction = `أنت "مساعد مَسار"، المساعد الذكي لموقع "مَسار" (سوق سوريا الشامل للسيارات والعقارات والأثاث والأدوات الكهربائية والإلكترونيات والألبسة).
+1. تفاعل بذكاء ولطف واحترام مع أي رسالة يكتبها المستخدم مهما كانت (تحية، نقطة، أو سؤال عام) تماماً مثل ChatGPT.
+2. أجب عن الأسئلة العامة المتعلقة بالسوق والشراء والبيع والأسعار في سوريا والعالم من معرفتك الواسعة.
 3. اعتمد في الإعلانات والأعضاء داخل موقع "مَسار" على البيانات الحية المرفقة أدناه، وأرفق الروابط النسبية (/cars/... أو /people/...) عند ذكر أي إعلان أو عضو داخل الموقع دون تأليف بيانات غير موجودة في الموقع.
 
 === الإعلانات المنشورة حالياً في موقع مَسار ===
@@ -87,7 +87,7 @@ ${usersContext}`
     : []
 
   const host = ['generativelanguage', 'googleapis', 'com'].join('.')
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash']
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
   let lastError = ''
 
   for (const modelName of modelsToTry) {
@@ -99,7 +99,6 @@ ${usersContext}`
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
           contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
-          tools: [{ googleSearch: {} }],
           generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
         }),
       })
