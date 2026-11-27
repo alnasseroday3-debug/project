@@ -7,14 +7,9 @@ import { listingCategoryLabels, type ListingCategory } from '@/lib/listing-categ
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
-  const groqKey = (process.env.GROQ_API_KEY || '').trim()
-  const geminiKey = (process.env.GEMINI_API_KEY || '').trim()
-
-  if (!groqKey && !geminiKey) {
-    return NextResponse.json(
-      { error: 'يرجى إضافة GROQ_API_KEY أو GEMINI_API_KEY في إعدادات Vercel.' },
-      { status: 500 },
-    )
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim()
+  if (!apiKey) {
+    return NextResponse.json({ error: 'مفتاح GEMINI_API_KEY غير موجود في إعدادات Vercel.' }, { status: 500 })
   }
 
   const body = (await request.json().catch(() => null)) as {
@@ -70,18 +65,13 @@ export async function POST(request: NextRequest) {
         .join('\n')
     }
   } catch (dbErr) {
-    console.error('DB read warning in AI assistant:', dbErr)
+    console.error('DB read warning:', dbErr)
   }
 
   const systemInstruction = `أنت "مساعد مَسار"، المساعد الذكي لموقع "مَسار" (سوق سوريا الشامل للسيارات والعقارات والأثاث والأدوات الكهربائية والإلكترونيات والألبسة).
-
-شخصيتك وطريقة ردك:
-1. كن ذكياً، طبيعياً، وسريع البديهة مثل ChatGPT؛ تفاعل مع أي رسالة يرسلها المستخدم مهما كانت قصيرة أو رمزية:
-   - إذا أرسل تحية (مثل: مرحبا، السلام عليكم، هلا) أو نقطة (.) أو حرفاً واحداً، رد عليه بترحيب دافئ وعرّفه بنفسك باختصار واسأله كيف يمكنك مساعدته في السوق.
-2. لديك مصدران للمعرفة:
-   - **الأول (الأولوية القصوى):** البيانات الحية لقاعدة بيانات موقع "مَسار" المرفقة أدناه (الإعلانات المعتمدة، الأسعار، المحافظات، والأعضاء). لا تؤلف أبداً إعلانات أو أسماء أعضاء غير موجودة في القائمة أدناه. وعندما تذكر إعلاناً أو عضواً من القائمة، أرفق رابطه النسبي (/cars/... أو /people/...).
-   - **الثاني (معرفتك العامة بالسوق):** إذا سأل المستخدم عن معلومات عامة تخص الشراء والبيع، أو مواصفات سيارة/جهاز، أو نصائح فحص قبل الشراء، أو مقارنة أسعار السوق في سوريا، أجب عليه بذكاء وخبرة من معرفتك العامة، ووضّح له ما إذا كان يتوفر شبيه له حالياً في إعلانات موقع "مَسار".
-3. حافظ دائماً على ارتباط المحادثة بمجال موقع "مَسار" والسوق والتجارة؛ وإذا طلب المستخدم شيئاً بعيداً تماماً عن الموقع والسوق (مثل كتابة شعر أو حل مسائل رياضية)، اعتذر بلطف ووجّهه لما يمكنك مساعدته به داخل "مَسار".
+1. تفاعل بذكاء ولطف مع أي رسالة (حتى لو كانت "مرحبا" أو "." أو حرفاً واحداً) وعرّف بنفسك باختصار واسأل كيف يمكنك المساعدة في السوق.
+2. اعتمد في الأسعار والإعلانات والأعضاء على البيانات الحية المرفقة أدناه من موقع "مَسار"، وأرفق الروابط النسبية (/cars/... أو /people/...) عند ذكر أي إعلان أو عضو. ولا تؤلف إعلانات غير موجودة.
+3. أجب عن الأسئلة العامة المتعلقة بالسوق والشراء والبيع بذكاء وخبرة، ووجّه أي طلب بعيد عن السوق بلطف.
 
 === الإعلانات المنشورة حالياً في موقع مَسار ===
 ${listingsContext}
@@ -91,66 +81,23 @@ ${usersContext}`
 
   const recentHistory = Array.isArray(body?.history)
     ? body.history.slice(-8).map((msg) => ({
-        role: msg.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-        content: String(msg.text || '').slice(0, 800),
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: String(msg.text || '').slice(0, 800) }],
       }))
     : []
 
-  if (groqKey) {
-    try {
-      const groqResponse = await fetch('https://groq.com', {
+  try {
+    const geminiResponse = await fetch(
+      'https://googleapis.com',
+      {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${groqKey}`,
+          'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: systemInstruction },
-            ...recentHistory,
-            { role: 'user', content: question },
-          ],
-          temperature: 0.4,
-          max_tokens: 800,
-        }),
-      })
-
-      if (!groqResponse.ok) {
-        const detail = await groqResponse.text().catch(() => '')
-        return NextResponse.json(
-          { error: `خطأ من Groq (${groqResponse.status}): ${detail.slice(0, 120)}` },
-          { status: 502 },
-        )
-      }
-
-      const groqData = (await groqResponse.json()) as {
-        choices?: Array<{ message?: { content?: string } }>
-      }
-      const reply = groqData.choices?.at(0)?.message?.content?.trim() || 'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
-      return NextResponse.json({ reply })
-    } catch (err) {
-      const cause = err instanceof Error && 'cause' in err ? String((err as { cause?: unknown }).cause) : ''
-      const msg = err instanceof Error ? err.message : 'خطأ غير معروف'
-      return NextResponse.json({ error: `فشل الاتصال بـ Groq: ${msg} ${cause}` }, { status: 500 })
-    }
-  }
-
-  try {
-    const geminiResponse = await fetch(
-      `https://googleapis.com{encodeURIComponent(geminiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents: [
-            ...recentHistory.map((m) => ({
-              role: m.role === 'assistant' ? 'model' : 'user',
-              parts: [{ text: m.content }],
-            })),
-            { role: 'user', parts: [{ text: question }] },
-          ],
+          contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
           generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
         }),
       },
@@ -159,7 +106,7 @@ ${usersContext}`
     if (!geminiResponse.ok) {
       const detail = await geminiResponse.text().catch(() => '')
       return NextResponse.json(
-        { error: `خطأ من Gemini (${geminiResponse.status}): ${detail.slice(0, 120)}` },
+        { error: `خطأ من Gemini (${geminiResponse.status}): ${detail.slice(0, 140)}` },
         { status: 502 },
       )
     }
@@ -170,11 +117,11 @@ ${usersContext}`
     const reply =
       geminiData.candidates?.at(0)?.content?.parts?.at(0)?.text?.trim() ||
       'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
+
     return NextResponse.json({ reply })
   } catch (err) {
-    const cause = err instanceof Error && 'cause' in err ? String((err as { cause?: unknown }).cause) : ''
     const msg = err instanceof Error ? err.message : 'خطأ غير معروف'
-    return NextResponse.json({ error: `فشل الاتصال: ${msg} ${cause}` }, { status: 500 })
+    return NextResponse.json({ error: `فشل الاتصال: ${msg}` }, { status: 500 })
   }
-      }
-  
+  }
+                     
