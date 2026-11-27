@@ -302,4 +302,122 @@ export function MyListings({ listings }: { listings: OwnerCarListing[] }) {
                 )
               })}
             </div>
-                                                                        
+                  ) : (
+            <section className="my-listings-empty">
+              <span><FileText aria-hidden="true" /></span>
+              <h2>لا توجد إعلانات بعد</h2>
+              <p>أضف إعلانك وراجع حالته من هذه الصفحة في أي وقت.</p>
+              <Link className="primary-button" href="/sell">أضف أول إعلان <ArrowLeft aria-hidden="true" /></Link>
+            </section>
+          )
+        ) : loadingFavorites ? (
+          <p className="marketplace-loading" role="status">جارٍ تحميل المفضلة…</p>
+        ) : favoriteListings.length ? (
+          <div className="my-listings-grid">
+            {favoriteListings.map((item) => {
+              const category = item.category ?? 'cars'
+              const isCar = category === 'cars'
+              const title = isCar ? [item.make, item.model].filter(Boolean).join(' ') : item.make || item.model
+              return (
+                <article className="my-listing-card" key={item.id}>
+                  <div className="my-listing-photo">
+                    <CarPhoto src={carImageUrl(item)} alt={title || 'إعلان محفوظ'} width={720} height={480} />
+                    <span className="listing-age-badge">
+                      {listingAgeLabel(item.publishedAt ? new Date(item.publishedAt) : null)}
+                    </span>
+                  </div>
+                  <div className="my-listing-content">
+                    <div className="my-listing-top">
+                      <span className="my-listing-status is-approved">
+                        <Bookmark aria-hidden="true" style={{ width: 14, height: 14, fill: 'currentColor' }} />
+                        محفوظ في المفضلة
+                      </span>
+                      {isCar && <span className="my-listing-year">{item.year}</span>}
+                    </div>
+                    <p className="listing-make">{isCar ? item.make : listingCategoryLabels[category]}</p>
+                    <h2>{isCar ? item.model : title}</h2>
+                    {item.city && (
+                      <p style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.88rem', color: '#64748b', margin: '0.25rem 0' }}>
+                        <MapPin style={{ width: 15, height: 15 }} aria-hidden="true" />
+                        {item.city}
+                      </p>
+                    )}
+                    <p className="my-listing-price" dir="ltr">${money.format(item.askingPrice)} USD</p>
+                    <Link className="my-listing-link" href={`/cars/${item.id}`}>
+                      مشاهدة تفاصيل الإعلان <ArrowLeft aria-hidden="true" />
+                    </Link>
+                    <button
+                      type="button"
+                      className="my-listing-delete"
+                      onClick={() => removeFavorite(String(item.id))}
+                    >
+                      <Trash2 aria-hidden="true" /> إزالة من المفضلة
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        ) : (
+          <section className="my-listings-empty">
+            <span><Bookmark aria-hidden="true" /></span>
+            <h2>قائمة المفضلة فارغة</h2>
+            <p>اضغط على أيقونة الحفظ (Bookmark) بجانب التفاعلات في أي إعلان لحفظه هنا.</p>
+            <Link className="primary-button" href="/">تصفّح السوق <ArrowLeft aria-hidden="true" /></Link>
+          </section>
+        )}
+      </main>
+
+      <dialog
+        ref={deleteDialogRef}
+        className="listing-delete-dialog"
+        aria-labelledby="listing-delete-title"
+        onCancel={() => setConfirmingListing(null)}
+        onClose={() => { if (confirmingListing) setConfirmingListing(null) }}
+      >
+        <div className="listing-delete-content">
+          <span className="listing-delete-icon"><Trash2 aria-hidden="true" /></span>
+          <span className="listing-delete-eyebrow">تأكيد الإجراء</span>
+          <h2 id="listing-delete-title">{confirmingListing ? removeLabels[confirmingListing.status as keyof typeof removeLabels] : 'إزالة الإعلان'}</h2>
+          <p>{confirmingListing?.archivedByAdmin
+            ? 'سيُخفى الإعلان من قائمتك فقط، وسيبقى محفوظاً ضمن أرشيف الإدارة.'
+            : confirmingListing?.status === 'approved'
+              ? 'سيختفي الإعلان فوراً عن الزوار، وسيُحفظ في أرشيف الإدارة. لن تتمكن من إعادته إلى العرض.'
+              : confirmingListing?.status === 'archived'
+                ? 'سيُخفى الإعلان من قائمتك فقط، وسيظل محفوظاً في أرشيف الإدارة.'
+                : confirmingListing?.status === 'pending'
+                  ? 'سيُلغى طلب المراجعة ويُحذف الإعلان وصوره نهائياً من حسابك.'
+                  : 'سيُحذف الإعلان المرفوض وصوره نهائياً، ولا يمكن التراجع عن هذا الإجراء.'}</p>
+          <div className="listing-delete-actions">
+            <button type="button" className="listing-delete-cancel" disabled={isDeleting} onClick={() => setConfirmingListing(null)}>تراجع</button>
+            <button type="button" className="listing-delete-confirm" disabled={isDeleting} onClick={confirmRemoval}>{isDeleting ? 'جارٍ التنفيذ…' : 'تأكيد'}</button>
+          </div>
+        </div>
+      </dialog>
+      <dialog
+        ref={renewalDialogRef}
+        className="listing-renewal-dialog"
+        aria-labelledby="listing-renewal-title"
+        onCancel={() => setRenewingListing(null)}
+        onClose={() => { if (renewingListing && !isRenewing) setRenewingListing(null) }}
+      >
+        <div className="listing-renewal-content">
+          <span className="listing-renewal-icon"><RefreshCw aria-hidden="true" /></span>
+          <span className="listing-delete-eyebrow">تجديد العرض</span>
+          <h2 id="listing-renewal-title">هل لا يزال إعلانك متوفراً ولم يُبع بعد؟</h2>
+          <p>اختر الحالة المناسبة؛ لا يتم تجديد الإعلان إلا بعد تأكيدك.</p>
+          <div className="listing-renewal-actions">
+            <button type="button" className="listing-renewal-confirm" disabled={isRenewing || isDeleting} onClick={confirmRenewal}>
+              <BadgeCheck aria-hidden="true" />{isRenewing ? 'جارٍ تجديد العرض…' : 'نعم، الإعلان لا يزال متوفراً — جدّد العرض 30 يوماً'}
+            </button>
+            <button type="button" className="listing-renewal-sold" disabled={isRenewing || isDeleting} onClick={handleSoldSelection}>
+              <Trash2 aria-hidden="true" />لا، تم البيع — إزالة الإعلان من العرض
+            </button>
+            <button type="button" className="listing-renewal-cancel" disabled={isRenewing || isDeleting} onClick={() => setRenewingListing(null)}>إلغاء</button>
+          </div>
+        </div>
+      </dialog>
+    </>
+  )
+}
+
