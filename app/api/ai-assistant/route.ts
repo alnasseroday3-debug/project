@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       .from(carListings)
       .where(eq(carListings.status, 'approved'))
       .orderBy(desc(carListings.createdAt))
-      .limit(60)
+      .limit(50)
 
     const visibleListings = allListings.filter((item) => !item.hiddenByOwner)
     if (visibleListings.length > 0) {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         bio: user.bio,
       })
       .from(user)
-      .limit(50)
+      .limit(40)
 
     if (allUsers.length > 0) {
       usersContext = allUsers
@@ -80,72 +80,67 @@ ${listingsContext}
 ${usersContext}`
 
   const recentHistory = Array.isArray(body?.history)
-    ? body.history.slice(-8).map((msg) => ({
+    ? body.history.slice(-6).map((msg) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: String(msg.text || '').slice(0, 800) }],
+        parts: [{ text: String(msg.text || '').slice(0, 600) }],
       }))
     : []
 
   const host = ['generativelanguage', 'googleapis', 'com'].join('.')
-  let modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.5-pro']
+  let fastModel = 'gemini-3-flash-preview'
 
   try {
     const listUrl = 'https://' + host + '/v1beta/models?key=' + encodeURIComponent(apiKey)
-    const listRes = await fetch(listUrl)
+    const listRes = await fetch(listUrl, { signal: AbortSignal.timeout(3000) })
     if (listRes.ok) {
       const listData = (await listRes.json()) as {
         models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>
       }
-      const available = (listData.models || [])
+      const flashModels = (listData.models || [])
         .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
         .map((m) => (m.name || '').replace(/^models\//, ''))
-        .filter((n) => n.includes('gemini') && !n.includes('tts') && !n.includes('image') && !n.includes('robotics'))
-      if (available.length > 0) {
-        modelsToTry = available
+        .filter((n) => n.includes('flash') && !n.includes('tts') && !n.includes('image') && !n.includes('2.0'))
+      if (flashModels.length > 0) {
+        fastModel = flashModels.at(0) || fastModel
       }
     }
   } catch {
-    // fallback to default list
+    // use default fastModel
   }
 
-  let lastError = ''
+  try {
+    const targetUrl = 'https://' + host + '/v1beta/models/' + fastModel + ':generateContent?key=' + encodeURIComponent(apiKey)
+    const geminiResponse = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(8000),
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 700 },
+      }),
+    })
 
-  for (const modelName of modelsToTry.slice(0, 5)) {
-    try {
-      const targetUrl = 'https://' + host + '/v1beta/models/' + modelName + ':generateContent?key=' + encodeURIComponent(apiKey)
-      const geminiResponse = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
-        }),
-      })
-
-      if (!geminiResponse.ok) {
-        const errText = await geminiResponse.text().catch(() => '')
-        lastError = modelName + ' (' + geminiResponse.status + '): ' + errText.slice(0, 120)
-        continue
-      }
-
-      const geminiData = (await geminiResponse.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
-      }
-      const parts = geminiData.candidates?.at(0)?.content?.parts || []
-      const reply =
-        parts.map((p) => p.text || '').join('').trim() ||
-        'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
-
-      return NextResponse.json({ reply })
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : 'خطأ اتصال'
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text().catch(() => '')
+      return NextResponse.json(
+        { error: 'خطأ من النموذج (' + fastModel + ' - ' + geminiResponse.status + '): ' + errText.slice(0, 120) },
+        { status: 502 },
+      )
     }
-  }
 
-  return NextResponse.json(
-    { error: 'تعذّر الحصول على رد: ' + lastError },
-    { status: 502 },
-  )
-          }
+    const geminiData = (await geminiResponse.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    }
+    const parts = geminiData.candidates?.at(0)?.content?.parts || []
+    const reply =
+      parts.map((p) => p.text || '').join('').trim() ||
+      'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
+
+    return NextResponse.json({ reply })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'انتهت مهلة الاتصال'
+    return NextResponse.json({ error: 'تعذّر الحصول على رد سريع (' + fastModel + '): ' + msg }, { status: 504 })
+  }
+}
   
