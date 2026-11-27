@@ -235,4 +235,4 @@ export function HomePage({ initialPage, isAuthenticated }: { initialPage: Listin
           <div className="hero-trust" aria-label="مزايا مَسار">
             <span><ShieldCheck aria-hidden="true" /> مراجعة قبل النشر</span>
             <span><CircleHelp aria-hidden="true" /> تواصل مباشر</span>
-                                                     
+
