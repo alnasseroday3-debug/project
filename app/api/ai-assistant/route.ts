@@ -1,7 +1,7 @@
-import { and, count, desc, eq, gt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, isNull, or } from 'drizzle-orm'
 import { NextResponse, type NextRequest } from 'next/server'
 import { db } from '@/lib/db'
-import { carListings, user, userFollows } from '@/lib/db/schema'
+import { carListings, user } from '@/lib/db/schema'
 import { listingCategoryLabels, type ListingCategory } from '@/lib/listing-categories'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,7 @@ function isRateLimited(ip: string) {
     rateMap.set(ip, { count: 1, resetAt: now + 60_000 })
     return false
   }
-  if (entry.count >= 15) return true
+  if (entry.count >= 25) return true
   entry.count += 1
   return false
 }
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: 'مفتاح الذكاء الاصطناعي غير مفعّل بعد في إعدادات الخادم.' }, { status: 500 })
+    return NextResponse.json({ error: 'مفتاح الذكاء الاصطناعي غير مفعّل في إعدادات Vercel.' }, { status: 500 })
   }
 
   const body = (await request.json().catch(() => null)) as {
@@ -37,9 +37,9 @@ export async function POST(request: NextRequest) {
     history?: Array<{ role: 'user' | 'assistant'; text: string }>
   } | null
 
-  const question = typeof body?.message === 'string' ? body.message.trim().slice(0, 600) : ''
+  const question = typeof body?.message === 'string' ? body.message.trim().slice(0, 800) : ''
   if (!question) {
-    return NextResponse.json({ error: 'يرجى كتابة سؤالك أولاً.' }, { status: 400 })
+    return NextResponse.json({ error: 'يرجى كتابة رسالتك أولاً.' }, { status: 400 })
   }
 
   try {
@@ -58,28 +58,18 @@ export async function POST(request: NextRequest) {
         description: carListings.description,
         verified: carListings.verified,
         sellerName: user.name,
-        sellerId: user.id,
       })
       .from(carListings)
       .leftJoin(user, eq(carListings.userId, user.id))
       .where(
         and(
           eq(carListings.status, 'approved'),
-          gt(carListings.expiresAt, new Date()),
           eq(carListings.hiddenByOwner, false),
+          or(isNull(carListings.expiresAt), gt(carListings.expiresAt, new Date())),
         ),
       )
-      .orderBy(desc(carListings.publishedAt), desc(carListings.createdAt))
+      .orderBy(desc(carListings.createdAt))
       .limit(80)
-
-    const followersSubquery = db
-      .select({
-        followedId: userFollows.followedId,
-        followersCount: count().as('followers_count'),
-      })
-      .from(userFollows)
-      .groupBy(userFollows.followedId)
-      .as('followers_sq')
 
     const platformUsers = await db
       .select({
@@ -88,21 +78,19 @@ export async function POST(request: NextRequest) {
         role: user.role,
         city: user.city,
         bio: user.bio,
-        followersCount: sql<number>`COALESCE(${followersSubquery.followersCount}, 0)`,
       })
       .from(user)
-      .leftJoin(followersSubquery, eq(user.id, followersSubquery.followedId))
-      .orderBy(desc(sql`COALESCE(${followersSubquery.followersCount}, 0)`), desc(user.createdAt))
+      .orderBy(desc(user.createdAt))
       .limit(50)
 
     const listingsContext =
       activeListings.length > 0
         ? activeListings
             .map((item) => {
-              const catKey = item.category as ListingCategory
+              const catKey = (item.category || 'cars') as ListingCategory
               const catLabel = listingCategoryLabels[catKey] || item.category
               const title = item.category === 'cars' ? `${item.make} ${item.model} (${item.year})` : `${item.make} ${item.model}`.trim()
-              return `- [${catLabel}] ${title} | السعر: $${item.askingPrice}${item.negotiable ? ' (قابل للتفاوض)' : ''} | المحافظة: ${item.city} | الحالة: ${item.condition === 'new' ? 'جديد' : 'مستعمل'} | البائع: ${item.sellerName || 'مستخدم'} | موثق: ${item.verified ? 'نعم' : 'لا'} | الوصف: ${(item.description || '').slice(0, 120)} | رابط الإعلان: /cars/${item.id}`
+              return `- [${catLabel}] ${title} | السعر: $${item.askingPrice}${item.negotiable ? ' (قابل للتفاوض)' : ''} | المحافظة: ${item.city || 'غير محددة'} | الحالة: ${item.condition === 'new' ? 'جديد' : 'مستعمل'} | البائع: ${item.sellerName || 'مستخدم'} | موثق: ${item.verified ? 'نعم' : 'لا'} | الوصف: ${(item.description || '').slice(0, 120)} | رابط الإعلان: /cars/${item.id}`
             })
             .join('\n')
         : 'لا توجد إعلانات منشورة في الموقع حالياً.'
@@ -112,29 +100,31 @@ export async function POST(request: NextRequest) {
         ? platformUsers
             .map(
               (person) =>
-                `- الاسم: ${person.name} | الدور: ${person.role === 'admin' ? 'إدارة الموقع' : 'عضو'} | المدينة: ${person.city || 'غير محددة'} | عدد المتابعين: ${person.followersCount} | النبذة: ${(person.bio || 'لا توجد').slice(0, 100)} | رابط البروفايل: /people/${person.id}`,
+                `- الاسم: ${person.name} | الصفة: ${person.role === 'admin' ? 'إدارة الموقع' : 'عضو'} | المدينة: ${person.city || 'غير محددة'} | النبذة: ${(person.bio || 'لا توجد').slice(0, 100)} | رابط البروفايل: /people/${person.id}`,
             )
             .join('\n')
         : 'لا يوجد أعضاء مسجلون حالياً.'
 
-    const systemInstruction = `أنت المساعد الذكي الرسمي لموقع "مَسار" (سوق سوريا الشامل).
-قواعد صارمة لا يجوز مخالفتها أبداً:
-1. أجب باللغة العربية بأسلوب ودود ومختصر وواضح.
-2. اعتمد حصرياً وفقط على البيانات الحية المرفقة أدناه من قاعدة بيانات موقع "مَسار".
-3. يُمنع منعاً باتاً تأليف أي أسعار أو إعلانات أو أسماء أشخاص غير موجودة في البيانات أدناه، ويُمنع الإجابة عن مواضيع عامة خارج نطاق موقع "مَسار".
-4. إذا سألك المستخدم عن شيء غير موجود في البيانات الحالية، قل له بوضوح: "عذراً، لا تتوفر حالياً بيانات أو إعلانات مطابقة لهذا الطلب في موقع مَسار."
-5. عند ذكر أي إعلان أو شخص مهم، اذكر تفاصيله بدقة وأرفق الرابط النسبي الخاص به (مثل /cars/... أو /people/...) ليتمكن المستخدم من زيارته مباشرة.
+    const systemInstruction = `أنت "مساعد مَسار"، المساعد الذكي لموقع "مَسار" (سوق سوريا الشامل للسيارات والعقارات والأثاث والأدوات الكهربائية والإلكترونيات والألبسة).
 
-=== الإعلانات المنشورة حالياً في الموقع ===
+شخصيتك وطريقة ردك:
+1. كن ذكياً، طبيعياً، وسريع البديهة مثل ChatGPT؛ تفاعل مع أي رسالة يرسلها المستخدم مهما كانت قصيرة أو رمزية:
+   - إذا أرسل تحية (مثل: مرحبا، السلام عليكم، هلا) أو نقطة (.) أو حرفاً واحداً، رد عليه بترحيب دافئ وعرّفه بنفسك باختصار واسأله كيف يمكنك مساعدته في السوق.
+2. لديك مصدران للمعرفة:
+   - **الأول (الأولوية القصوى):** البيانات الحية لقاعدة بيانات موقع "مَسار" المرفقة أدناه (الإعلانات المعتمدة، الأسعار، المحافظات، والأعضاء). لا تؤلف أبداً إعلانات أو أسماء أعضاء غير موجودة في القائمة أدناه. وعندما تذكر إعلاناً أو عضواً من القائمة، أرفق رابطه النسبي (/cars/... أو /people/...).
+   - **الثاني (معرفتك العامة بالسوق):** إذا سأل المستخدم عن معلومات عامة تخص الشراء والبيع، أو مواصفات سيارة/جهاز، أو نصائح فحص قبل الشراء، أو مقارنة أسعار السوق في سوريا، أجب عليه بذكاء وخبرة من معرفتك العامة، ووضّح له ما إذا كان يتوفر شبيه له حالياً في إعلانات موقع "مَسار".
+3. حافظ دائماً على ارتباط المحادثة بمجال موقع "مَسار" والسوق والتجارة؛ وإذا طلب المستخدم شيئاً بعيداً تماماً عن الموقع والسوق (مثل كتابة شعر أو حل مسائل رياضية)، اعتذر بلطف ووجّهه لما يمكنك مساعدته به داخل "مَسار".
+
+=== الإعلانات المنشورة حالياً في موقع مَسار ===
 ${listingsContext}
 
-=== الأعضاء والأشخاص في الموقع ===
+=== الأعضاء والأشخاص في موقع مَسار ===
 ${usersContext}`
 
     const recentHistory = Array.isArray(body?.history)
-      ? body.history.slice(-6).map((msg) => ({
+      ? body.history.slice(-8).map((msg) => ({
           role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: String(msg.text || '').slice(0, 600) }],
+          parts: [{ text: String(msg.text || '').slice(0, 800) }],
         }))
       : []
 
@@ -147,15 +137,15 @@ ${usersContext}`
           systemInstruction: { parts: [{ text: systemInstruction }] },
           contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
           generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 700,
+            temperature: 0.4,
+            maxOutputTokens: 800,
           },
         }),
       },
     )
 
     if (!geminiResponse.ok) {
-      return NextResponse.json({ error: 'تعذّر الاتصال بخدمة الذكاء الاصطناعي حالياً.' }, { status: 502 })
+      return NextResponse.json({ error: `تعذّر الاتصال بخدمة الذكاء الاصطناعي (${geminiResponse.status}).` }, { status: 502 })
     }
 
     const geminiData = (await geminiResponse.json()) as {
@@ -165,10 +155,12 @@ ${usersContext}`
     const firstPart = firstCandidate?.content?.parts?.at(0)
     const reply =
       firstPart?.text?.trim() ||
-      'عذراً، لم أتمكن من صياغة إجابة واضحة. حاول إعادة صياغة سؤالك.'
+      'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
 
     return NextResponse.json({ reply })
-  } catch {
-    return NextResponse.json({ error: 'حدث خطأ أثناء تحليل البيانات.' }, { status: 500 })
+  } catch (err) {
+    console.error('AI Assistant error:', err)
+    return NextResponse.json({ error: 'حدث خطأ أثناء معالجة رسالتك.' }, { status: 500 })
   }
-      }
+        }
+  
