@@ -87,10 +87,30 @@ ${usersContext}`
     : []
 
   const host = ['generativelanguage', 'googleapis', 'com'].join('.')
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
+  let modelsToTry = ['gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-2.5-pro']
+
+  try {
+    const listUrl = 'https://' + host + '/v1beta/models?key=' + encodeURIComponent(apiKey)
+    const listRes = await fetch(listUrl)
+    if (listRes.ok) {
+      const listData = (await listRes.json()) as {
+        models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>
+      }
+      const available = (listData.models || [])
+        .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+        .map((m) => (m.name || '').replace(/^models\//, ''))
+        .filter((n) => n.includes('gemini') && !n.includes('tts') && !n.includes('image') && !n.includes('robotics'))
+      if (available.length > 0) {
+        modelsToTry = available
+      }
+    }
+  } catch {
+    // fallback to default list
+  }
+
   let lastError = ''
 
-  for (const modelName of modelsToTry) {
+  for (const modelName of modelsToTry.slice(0, 5)) {
     try {
       const targetUrl = 'https://' + host + '/v1beta/models/' + modelName + ':generateContent?key=' + encodeURIComponent(apiKey)
       const geminiResponse = await fetch(targetUrl, {
@@ -127,5 +147,5 @@ ${usersContext}`
     { error: 'تعذّر الحصول على رد: ' + lastError },
     { status: 502 },
   )
-        }
-      
+          }
+  
