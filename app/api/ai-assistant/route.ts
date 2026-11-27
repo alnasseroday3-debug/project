@@ -68,10 +68,10 @@ export async function POST(request: NextRequest) {
     console.error('DB read warning:', dbErr)
   }
 
-  const systemInstruction = `أنت "مساعد مَسار"، المساعد الذكي لموقع "مَسار" (سوق سوريا الشامل للسيارات والعقارات والأثاث والأدوات الكهربائية والإلكترونيات والألبسة).
-1. تفاعل بذكاء ولطف مع أي رسالة (حتى لو كانت "مرحبا" أو "." أو حرفاً واحداً) وعرّف بنفسك باختصار واسأل كيف يمكنك المساعدة في السوق.
-2. اعتمد في الأسعار والإعلانات والأعضاء على البيانات الحية المرفقة أدناه من موقع "مَسار"، وأرفق الروابط النسبية (/cars/... أو /people/...) عند ذكر أي إعلان أو عضو. ولا تؤلف إعلانات غير موجودة.
-3. أجب عن الأسئلة العامة المتعلقة بالسوق والشراء والبيع بذكاء وخبرة، ووجّه أي طلب بعيد عن السوق بلطف.
+  const systemInstruction = `أنت "مساعد مَسار"، المساعد الذكي الرسمي لموقع "مَسار" (سوق سوريا الشامل للسيارات والعقارات والأثاث والأدوات الكهربائية والإلكترونيات والألبسة).
+1. تفاعل بذكاء ولطف واحترام مع أي رسالة يكتبها المستخدم مهما كانت (تحية، سؤال عام، أو استفسار دقيق) تماماً مثل ChatGPT.
+2. لديك صلاحية البحث الحي في جوجل (Google Search) للوصول إلى أحدث المعلومات والأسعار في سوريا والعالم للإجابة بدقة عن أي سؤال عام أو تقني أو تجاري.
+3. اعتمد في الإعلانات والأعضاء داخل موقع "مَسار" على البيانات الحية المرفقة أدناه، وأرفق الروابط النسبية (/cars/... أو /people/...) عند ذكر أي إعلان أو عضو داخل الموقع دون تأليف بيانات غير موجودة في الموقع.
 
 === الإعلانات المنشورة حالياً في موقع مَسار ===
 ${listingsContext}
@@ -86,35 +86,36 @@ ${usersContext}`
       }))
     : []
 
-  const host = '://googleapis.com'
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest']
+  const host = ['generativelanguage', 'googleapis', 'com'].join('.')
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash']
   let lastError = ''
 
   for (const modelName of modelsToTry) {
     try {
-      const endpoint = new URL(`https://${host}/v1beta/models/${modelName}:generateContent`)
-      endpoint.searchParams.set('key', apiKey)
-
-      const geminiResponse = await fetch(endpoint.toString(), {
+      const targetUrl = 'https://' + host + '/v1beta/models/' + modelName + ':generateContent?key=' + encodeURIComponent(apiKey)
+      const geminiResponse = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
           contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
+          tools: [{ googleSearch: {} }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
         }),
       })
 
       if (!geminiResponse.ok) {
-        lastError = `${modelName}: ${geminiResponse.status}`
+        const errText = await geminiResponse.text().catch(() => '')
+        lastError = modelName + ' (' + geminiResponse.status + '): ' + errText.slice(0, 120)
         continue
       }
 
       const geminiData = (await geminiResponse.json()) as {
         candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
       }
+      const parts = geminiData.candidates?.at(0)?.content?.parts || []
       const reply =
-        geminiData.candidates?.at(0)?.content?.parts?.at(0)?.text?.trim() ||
+        parts.map((p) => p.text || '').join('').trim() ||
         'أهلاً بك في مَسار! كيف يمكنني مساعدتك اليوم؟'
 
       return NextResponse.json({ reply })
@@ -124,8 +125,7 @@ ${usersContext}`
   }
 
   return NextResponse.json(
-    { error: `تعذّر الحصول على رد من الذكاء الاصطناعي (${lastError}). تأكد من صلاحية مفتاح GEMINI_API_KEY في Google AI Studio.` },
+    { error: 'تعذّر الحصول على رد: ' + lastError },
     { status: 502 },
   )
 }
-  
