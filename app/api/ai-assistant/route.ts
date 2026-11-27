@@ -2,7 +2,7 @@ import { and, count, desc, eq, gt, sql } from 'drizzle-orm'
 import { NextResponse, type NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { carListings, user, userFollows } from '@/lib/db/schema'
-import { listingCategoryLabels } from '@/lib/listing-categories'
+import { listingCategoryLabels, type ListingCategory } from '@/lib/listing-categories'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,8 +21,8 @@ function isRateLimited(ip: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const forwarded = request.headers.get('x-forwarded-for') || ''
-  const ip = forwarded.split(',')[0]?.trim() || 'unknown'
+  const forwarded = request.headers.get('x-forwarded-for') ?? ''
+  const ip = forwarded.split(',').at(0)?.trim() || 'unknown'
   if (isRateLimited(ip)) {
     return NextResponse.json({ error: 'تم إرسال عدد كبير من الأسئلة. يرجى الانتظار دقيقة.' }, { status: 429 })
   }
@@ -99,7 +99,8 @@ export async function POST(request: NextRequest) {
       activeListings.length > 0
         ? activeListings
             .map((item) => {
-              const catLabel = listingCategoryLabels[item.category] || item.category
+              const catKey = item.category as ListingCategory
+              const catLabel = listingCategoryLabels[catKey] || item.category
               const title = item.category === 'cars' ? `${item.make} ${item.model} (${item.year})` : `${item.make} ${item.model}`.trim()
               return `- [${catLabel}] ${title} | السعر: $${item.askingPrice}${item.negotiable ? ' (قابل للتفاوض)' : ''} | المحافظة: ${item.city} | الحالة: ${item.condition === 'new' ? 'جديد' : 'مستعمل'} | البائع: ${item.sellerName || 'مستخدم'} | موثق: ${item.verified ? 'نعم' : 'لا'} | الوصف: ${(item.description || '').slice(0, 120)} | رابط الإعلان: /cars/${item.id}`
             })
@@ -160,8 +161,8 @@ ${usersContext}`
     const geminiData = (await geminiResponse.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
     }
-    const firstCandidate = geminiData.candidates?.[0]
-    const firstPart = firstCandidate?.content?.parts?.[0]
+    const firstCandidate = geminiData.candidates?.at(0)
+    const firstPart = firstCandidate?.content?.parts?.at(0)
     const reply =
       firstPart?.text?.trim() ||
       'عذراً، لم أتمكن من صياغة إجابة واضحة. حاول إعادة صياغة سؤالك.'
@@ -170,4 +171,4 @@ ${usersContext}`
   } catch {
     return NextResponse.json({ error: 'حدث خطأ أثناء تحليل البيانات.' }, { status: 500 })
   }
-                                        }
+      }
