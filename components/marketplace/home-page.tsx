@@ -118,8 +118,7 @@ function ListingCard({ listing, isAuthenticated }: { listing: HomeListing; isAut
     </article>
   )
 }
-
-export function HomePage({ isAuthenticated }: { initialPage?: ListingsPage; isAuthenticated: boolean }) {
+  export function HomePage({ isAuthenticated }: { initialPage?: ListingsPage; isAuthenticated: boolean }) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<'all' | ListingCategory>('all')
   const [governorate, setGovernorate] = useState('')
@@ -209,4 +208,83 @@ export function HomePage({ isAuthenticated }: { initialPage?: ListingsPage; isAu
           <Link className="marketplace-add-button" href="/sell"><span>+</span> إضافة إعلان</Link>
           <div className="marketplace-filter-group" aria-label="تصفية الإعلانات">
             <label className="marketplace-select"><span>المحافظة</span><select value={governorate} onChange={(event) => setGovernorate(event.target.value)} aria-label="تصفية حسب المحافظة"><option value="">كل المحافظات</option>{syrianGovernorates.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
-    
+            <label className="marketplace-select"><span>تاريخ النشر</span><select value={publicationPeriod} onChange={(event) => setPublicationPeriod(event.target.value as typeof publicationPeriod)} aria-label="تصفية حسب تاريخ النشر"><option value="all">الكل</option><option value="week">أسبوع</option><option value="month">شهر</option><option value="year">سنة</option></select></label>
+          </div>
+        </div>
+
+        <CategoryGrid selectedCategory={category} onSelect={selectCategory} />
+
+        {showInventory && (
+          <section className="inventory-section" id="listings" aria-labelledby="listings-title">
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow eyebrow-green">نتائج التصفية</span>
+                <h2 id="listings-title">{category !== 'all' ? listingCategoryLabels[category] : 'نتائج البحث'}</h2>
+                <p>الإعلانات المنشورة المطابقة لاختيارك.</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span className="result-count"><Clock3 aria-hidden="true" /> {loadedCount}{hasMore ? '+' : ''} إعلان</span>
+                <button type="button" className="filter-chip" onClick={resetFilters}><X aria-hidden="true" style={{ width: 14, height: 14 }} /> إغلاق</button>
+              </div>
+            </div>
+
+            {category === 'cars' && (
+              <div className="marketplace-car-filters">
+                <div className="filter-tabs" role="group" aria-label="تصفية السيارات حسب حالتها">
+                  {([['all', 'الكل'], ['new', 'جديدة'], ['used', 'مستعملة']] as const).map(([value, label]) => (
+                    <button key={value} type="button" className={condition === value ? 'filter-chip is-selected' : 'filter-chip'} onClick={() => setCondition(value)} aria-pressed={condition === value}>{label}</button>
+                  ))}
+                </div>
+                <fieldset className="price-filter">
+                  <legend className="sr-only">نطاق السعر بالدولار الأمريكي</legend>
+                  <label><span className="sr-only">أقل سعر</span><input aria-label="أقل سعر بالدولار" type="number" min="1" inputMode="numeric" placeholder="من $" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label>
+                  <span aria-hidden="true">–</span>
+                  <label><span className="sr-only">أعلى سعر</span><input aria-label="أعلى سعر بالدولار" type="number" min="1" inputMode="numeric" placeholder="إلى $" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
+                </fieldset>
+              </div>
+            )}
+
+            {category === 'cars' && (
+              <div className="brand-filter-strip" role="group" aria-label="تصفية السيارات حسب الماركة">
+                <button type="button" className={selectedBrand === 'all' ? 'brand-filter-chip is-selected' : 'brand-filter-chip'} onClick={() => setSelectedBrand('all')} aria-pressed={selectedBrand === 'all'}><CarFront aria-hidden="true" /><span>كل الماركات</span></button>
+                {brands.map((brand) => (
+                  <button key={brand.value} type="button" className={selectedBrand === brand.value ? 'brand-filter-chip is-selected' : 'brand-filter-chip'} onClick={() => setSelectedBrand(brand.value)} aria-pressed={selectedBrand === brand.value}><CarFront aria-hidden="true" /><span>{brand.label}</span></button>
+                ))}
+              </div>
+            )}
+
+            {error && <p className="marketplace-fetch-error" role="alert">تعذّر تحميل الإعلانات. حدّث الصفحة للمحاولة مجدداً.</p>}
+            {listings.length ? (
+              <div className="listing-grid">
+                {listings.map((listing) => <ListingCard key={listing.id} listing={listing} isAuthenticated={isAuthenticated} />)}
+              </div>
+            ) : isLoading ? (
+              <p className="marketplace-loading" role="status">جارٍ تحميل الإعلانات…</p>
+            ) : (
+              <div className="empty-results">
+                <Search aria-hidden="true" />
+                <strong>لا توجد إعلانات مطابقة</strong>
+                <span>جرّب تغيير كلمات البحث أو الفلاتر.</span>
+              </div>
+            )}
+            {hasMore && (
+              <div className="marketplace-load-more-wrap">
+                <button className="marketplace-load-more" type="button" onClick={() => setSize(size + 1)} disabled={isValidating}>
+                  {isValidating ? 'جارٍ تحميل المزيد…' : 'عرض المزيد'} <ArrowLeft aria-hidden="true" />
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+
+      <section className="sell-banner page-container">
+        <div className="sell-banner-mark"><span className="banner-car-icon">مَ</span></div>
+        <div><span className="eyebrow">خطوتك التالية</span><h2>لديك شيء تريد عرضه؟</h2><p>أضف إعلانك في القسم المناسب، وفريقنا يتولى مراجعته قبل النشر.</p></div>
+        <Link href="/sell" className="banner-button">أضف إعلانك <ArrowLeft aria-hidden="true" /></Link>
+      </section>
+      <div className="bottom-spacer" />
+    </main>
+  )
+  }
+      
