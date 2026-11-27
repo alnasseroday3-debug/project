@@ -21,7 +21,8 @@ function isRateLimited(ip: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')?.trim() || 'unknown'
+  const forwarded = request.headers.get('x-forwarded-for') || ''
+  const ip = forwarded.split(',')[0]?.trim() || 'unknown'
   if (isRateLimited(ip)) {
     return NextResponse.json({ error: 'تم إرسال عدد كبير من الأسئلة. يرجى الانتظار دقيقة.' }, { status: 429 })
   }
@@ -159,13 +160,14 @@ ${usersContext}`
     const geminiData = (await geminiResponse.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
     }
+    const firstCandidate = geminiData.candidates?.[0]
+    const firstPart = firstCandidate?.content?.parts?.[0]
     const reply =
-      geminiData.candidates?.?.content?.parts?.?.text?.trim() ||
+      firstPart?.text?.trim() ||
       'عذراً، لم أتمكن من صياغة إجابة واضحة. حاول إعادة صياغة سؤالك.'
 
     return NextResponse.json({ reply })
   } catch {
     return NextResponse.json({ error: 'حدث خطأ أثناء تحليل البيانات.' }, { status: 500 })
   }
-        }
-        
+                                        }
